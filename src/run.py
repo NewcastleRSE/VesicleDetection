@@ -2,7 +2,7 @@ import zarr
 import gunpowder as gp 
 import math 
 
-from src.training import Training 
+from training import Training 
 
 class Run():
 
@@ -42,4 +42,12 @@ if __name__ == "__main__":
 
     batch, ret = run.run_training(iterations=1)
 
-    print(batch, ret)
+    # Output the predicitions for background, PC+ and PC-
+    # Total should be 1 everywhere. Something seems to be wrong! 
+
+    back_pred = ret['prediction'].data[0,:,:,:]
+    pos_pred = ret['prediction'].data[1,:,:,:]
+    neg_pred = ret['prediction'].data[2,:,:,:]
+    total = back_pred + pos_pred + neg_pred 
+
+    print(total)
