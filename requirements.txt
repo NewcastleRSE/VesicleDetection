@@ -1,0 +1,9 @@
+numpy 
+math
+os
+torch 
+zarr 
+gunpowder 
+matplotlib
+git 
+git+https://github.com/funkelab/funlib.learn.torch.git
