@@ -1,20 +1,20 @@
-import torch 
+import torch
 from funlib.learn.torch.models import UNet, ConvPass
 
 
 class Model():
 
-    def __init__(self, 
+    def __init__(self,
                 raw_num_channels,
-                input_shape, 
+                input_shape,
                 voxel_size,
                 fmaps = 32,
-                fmap_inc_factor = 5, 
-                downsample_factors = [(2,2,2),(2,2,2)], 
-                padding = 'valid', 
+                fmap_inc_factor = 5,
+                downsample_factors = [(2,2,2),(2,2,2)],
+                padding = 'valid',
                 constant_upsample = True
                 ):
-        
+    
         fmaps_in = max(1, raw_num_channels)
         levels = len(downsample_factors) + 1
         dims = len(downsample_factors[0])
@@ -31,7 +31,7 @@ class Model():
             downsample_factors = downsample_factors,
             constant_upsample = True,
             padding = padding,
-            voxel_size = voxel_size 
+            voxel_size = voxel_size
         )
 
         self.model = torch.nn.Sequential(
@@ -46,7 +46,7 @@ class Model():
         self.optimizer = torch.optim.Adam(self.model.parameters())
 
     def save_model(self):
-        pass 
+        pass
 
     def load_model(self):
-        pass 
+        pass

@@ -1,42 +1,40 @@
-import zarr 
-import gunpowder as gp  
+import gunpowder as gp
 
-from src.data_loader import EMData 
-from src.model import Model 
-from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims 
+from src.data_loader import EMData
+from src.model import Model
+from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
 
 class Training():
-    
     def __init__(self,
-                zarr_path: str, 
-                clahe=False,  
+                zarr_path: str,
+                clahe=False,
                 input_shape = (44, 96, 96),
                 output_shape = (4,56,56)
                 ):
-                
+          
         # Load in the data and create target arrays
         self.zarr_path = zarr_path
         self.training_data = EMData(self.zarr_path, "train", clahe=clahe)
         self.validate_data = EMData(self.zarr_path, "validate", clahe=clahe)
         self.training_data.create_target()
         self.validate_data.create_target()
-        self.input_shape = input_shape 
+        self.input_shape = input_shape
         self.output_shape = output_shape
 
         # Obtain shape for prediciton
         if self.input_shape[0] >= self.validate_data.raw_data.shape[0]:
-            predict_shape_z = self.input_shape[0] 
-        else: 
+            predict_shape_z = self.input_shape[0]
+        else:
             predict_shape_z = self.validate_data.raw_data.shape[0]
         
         if self.input_shape[1] >= self.validate_data.raw_data.shape[1]:
-            predict_shape_x = self.input_shape[1] 
-        else: 
+            predict_shape_x = self.input_shape[1]
+        else:
             predict_shape_x = self.validate_data.raw_data.shape[1]
 
         if self.input_shape[2] >= self.validate_data.raw_data.shape[2]:
-            predict_shape_y = self.input_shape[2] 
-        else: 
+            predict_shape_y = self.input_shape[2]
+        else:
             predict_shape_y = self.validate_data.raw_data.shape[2]
 
         self.predict_shape = (predict_shape_z, predict_shape_x, predict_shape_y)
@@ -46,80 +44,80 @@ class Training():
         output_shape = gp.Coordinate(self.output_shape)
         predict_shape = gp.Coordinate(self.predict_shape)
         self.input_size = self.training_data.voxel_size * input_shape
-        self.output_size = self.training_data.voxel_size * output_shape 
-        self.predict_size = self.validate_data.voxel_size * predict_shape 
+        self.output_size = self.training_data.voxel_size * output_shape
+        self.predict_size = self.validate_data.voxel_size * predict_shape
 
-        # Check if there are multiple channels within the raw data. 
-        # This shouldn't be the case for us as EM data is 'colourblind'. 
+        # Check if there are multiple channels within the raw data.
+        # This shouldn't be the case for us as EM data is 'colourblind'.
         if len(self.training_data.raw_data.shape) == 3:
-            self.raw_channels = 1 
+            self.raw_channels = 1
         elif len(self.training_data.raw_data.shape) == 4:
             self.raw_channels = self.training_data.raw_data.shape[0]
 
         if self.raw_channels == 1:
-            self.channel_dims = 0 
+            self.channel_dims = 0
         else:
             self.channel_dims = 1
 
         self.model = Model(
-                    raw_num_channels=self.raw_channels, 
-                    input_shape = self.input_shape, 
+                    raw_num_channels=self.raw_channels,
+                    input_shape = self.input_shape,
                     voxel_size = self.training_data.voxel_size
-                    ) 
+                    )
 
-    def training_pipeline( 
-                self, 
+    def training_pipeline(
+                self,
                 augmentations: list,
-                batch_size: int, 
+                batch_size: int,
                 snapshot_every = 0,
                 outdir = None
                 ):
-        
+
         # Set the model to train mode
-        self.model.model.train() 
-        
+        self.model.model.train()
+
         # Define the gunpowder arrays
         raw = gp.ArrayKey('RAW')
         mask = gp.ArrayKey('MASK')
         target = gp.ArrayKey('TARGET')
         prediction = gp.ArrayKey('PREDICTION')
-        
+
         # Create the source node for pipeline
-        if self.training_data.has_mask == True: 
+        if self.training_data.has_mask:
             source = gp.ZarrSource(
-                        self.training_data.zarr_path, 
+                        self.training_data.zarr_path,
                         {
                             raw: self.training_data.raw_data_path,
                             target: self.training_data.target_data_path,
                             mask: self.training_data.mask_data_path
-                        },  
+                        },
                         {
                             raw: gp.ArraySpec(interpolatable=True),
                             target: gp.ArraySpec(interpolatable=False),
                             mask: gp.ArraySpec(interpolatable=False)
-                        } 
+                        }
                     )
             
-        else: 
+        else:
             source = gp.ZarrSource(
-                    self.training_data.zarr_path, 
+                    self.training_data.zarr_path,
                     {
                         raw: self.training_data.raw_data_path,
                         target: self.training_data.target_data_path
-                    },  
+                    },
                     {
                         raw: gp.ArraySpec(interpolatable=True),
                         target: gp.ArraySpec(interpolatable=False)
-                    } 
+                    }
                 )
 
         # Start building the pipeline
-        pipeline = source 
+        pipeline = source
 
         pipeline += gp.Pad(raw, None)
         pipeline += gp.Pad(target, (self.input_size-self.output_size)/2 )
         pipeline += gp.Normalize(raw)
-        if self.training_data.has_mask == True:
+        if self.training_data.has_mask:
             pipeline += gp.RandomLocation(min_masked=0.1, mask=self.training_data.mask_data)
         else:
             pipeline += gp.RandomLocation()
@@ -127,12 +125,13 @@ class Training():
         for augmentation in augmentations:
             pipeline += augmentation
 
-        if self.training_data.has_mask == True:
+        if self.training_data.has_mask:
             loss_inputs = {0: prediction, 1: target, 2: mask}
         else:
             loss_inputs = {0: prediction, 1: target}
 
-        # Note it is important to add channel_dims BEFORE stack, as the CrossEntropyLoss requires this formating 
+        # Note it is important to add channel_dims BEFORE stack,
+        # as the CrossEntropyLoss requires this formating.
         if self.channel_dims == 0:
             pipeline += AddChannelDim(raw)
 
@@ -153,7 +152,7 @@ class Training():
             pipeline += TransposeDims(raw, (1, 0, 2, 3, 4))
 
             if self.channel_dims == 0:
-                    pipeline += RemoveChannelDim(raw)
+                pipeline += RemoveChannelDim(raw)
 
         # Create BatchRequest and add arrays with corresponding ROIs
         request = gp.BatchRequest()
@@ -178,13 +177,13 @@ class Training():
 
         # Create the source node for pipeline
         source = gp.ZarrSource(
-                self.validate_data.zarr_path, 
+                self.validate_data.zarr_path,
                 {
                     raw: self.validate_data.raw_data_path
-                },  
+                },
                 {
                     raw: gp.ArraySpec(interpolatable=True)
-                } 
+                }
             )
 
         # Start building the pipeline
@@ -197,7 +196,7 @@ class Training():
         if self.channel_dims == 0:
             pipeline += AddChannelDim(raw)
         
-        # This accounts for us having a batch with size 1 
+        # This accounts for us having a batch with size 1
         pipeline += AddChannelDim(raw)
 
         pipeline += gp.torch.Predict(
@@ -225,8 +224,8 @@ class Training():
                     'raw': batch[raw],
                     'prediction': batch[prediction]
                 }
-        return ret 
+        return ret
 
 
     def load_trained_model(self):
-        pass 
+        pass
