@@ -1,6 +1,8 @@
 from setuptools import find_packages, setup 
 from typing import List
 
+# This implimentation is based on one written by Krish Naik, and this comment is to give credit.
+
 HYPTHON_E_DOT = '-e .'
 def get_requirements(file_path:str)->List[str]:
     '''
