@@ -23,11 +23,31 @@ class Training():
         self.input_shape = input_shape 
         self.output_shape = output_shape
 
+        # Obtain shape for prediciton
+        if self.input_shape[0] >= self.validate_data.raw_data.shape[0]:
+            predict_shape_z = self.input_shape[0] 
+        else: 
+            predict_shape_z = self.validate_data.raw_data.shape[0]
+        
+        if self.input_shape[1] >= self.validate_data.raw_data.shape[1]:
+            predict_shape_x = self.input_shape[1] 
+        else: 
+            predict_shape_x = self.validate_data.raw_data.shape[1]
+
+        if self.input_shape[2] >= self.validate_data.raw_data.shape[2]:
+            predict_shape_y = self.input_shape[2] 
+        else: 
+            predict_shape_y = self.validate_data.raw_data.shape[2]
+
+        self.predict_shape = (predict_shape_z, predict_shape_x, predict_shape_y)
+
         # Switch to world units for use with gunpowder
         input_shape = gp.Coordinate(self.input_shape)
         output_shape = gp.Coordinate(self.output_shape)
+        predict_shape = gp.Coordinate(self.predict_shape)
         self.input_size = self.training_data.voxel_size * input_shape
         self.output_size = self.training_data.voxel_size * output_shape 
+        self.predict_size = self.validate_data.voxel_size * predict_shape 
 
         # Check if there are multiple channels within the raw data. 
         # This shouldn't be the case for us as EM data is 'colourblind'. 
@@ -195,8 +215,8 @@ class Training():
         pipeline += gp.Scan(scan_request)
 
         total_request = gp.BatchRequest()
-        total_request.add(raw, gp.Coordinate((44,325,600))*self.validate_data.voxel_size)
-        total_request.add(prediction, gp.Coordinate((44,325,600))*self.validate_data.voxel_size)
+        total_request.add(raw, self.predict_size)
+        total_request.add(prediction, self.predict_size)
 
 
         with gp.build(pipeline):

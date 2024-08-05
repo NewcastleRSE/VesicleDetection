@@ -3,6 +3,7 @@ import gunpowder as gp
 import math 
 
 from src.training import Training 
+from src.visualisation import imshow 
 
 class Run():
 
@@ -51,3 +52,5 @@ if __name__ == "__main__":
     total = back_pred + pos_pred + neg_pred 
 
     print(total)
+
+    imshow(ret['raw'].data)
