@@ -124,11 +124,15 @@ celerybeat.pid
 # Environments
 .env
 .venv
+.VesicleDetectionEnv
 env/
 venv/
 ENV/
+VesicleDetectionEnv/
 env.bak/
 venv.bak/
+VesicleDetectionEnv.bak/
+
 
 # Spyder project settings
 .spyderproject

@@ -1,9 +1,7 @@
-numpy 
-math
-os
+gunpowder
+numpy == 1.26.4
 torch 
 zarr 
-gunpowder 
-matplotlib
-git 
-git+https://github.com/funkelab/funlib.learn.torch.git
+matplotlib 
+funlib-learn-torch @ git+https://github.com/funkelab/funlib.learn.torch.git
+-e .

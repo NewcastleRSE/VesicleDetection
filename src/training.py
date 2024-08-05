@@ -1,9 +1,9 @@
 import zarr 
 import gunpowder as gp  
 
-from data_loader import EMData 
-from model import Model 
-from gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims 
+from src.data_loader import EMData 
+from src.model import Model 
+from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims 
 
 class Training():
     

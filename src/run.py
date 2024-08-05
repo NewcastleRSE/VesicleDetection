@@ -2,7 +2,7 @@ import zarr
 import gunpowder as gp 
 import math 
 
-from training import Training 
+from src.training import Training 
 
 class Run():
 
