@@ -13,9 +13,7 @@ class Training():
                 input_shape = (44, 96, 96),
                 output_shape = (4,56,56)
                 ):
-        
-# QUESTION FOR JAN: how do we determine the input and output shapes?
-        
+                
         # Load in the data and create target arrays
         self.zarr_path = zarr_path
         self.training_data = EMData(self.zarr_path, "train", clahe=clahe)
@@ -56,8 +54,6 @@ class Training():
                 snapshot_every = 0,
                 outdir = None
                 ):
-        
-        # A lot of this is based off the pipeline in the again implementation
         
         # Set the model to train mode
         self.model.model.train() 
@@ -100,8 +96,6 @@ class Training():
         # Start building the pipeline
         pipeline = source 
 
-# QUESTION FOR JAN: How come I can put infinite pad here? It doesn't like it on target, though. 
-# How come again code doesn't pad target?
         pipeline += gp.Pad(raw, None)
         pipeline += gp.Pad(target, (self.input_size-self.output_size)/2 )
         pipeline += gp.Normalize(raw)
@@ -150,11 +144,6 @@ class Training():
         return pipeline, request
     
     def validate_pipeline(self):
-
-        # A lot of this is based off the pipeline in the again implementation
-
-        # Main issue: getting the ROIs correct so that can predict on the full image.
-        # Another issue: it appears that batch['target'] is all 0s. Not sure why. 
     
         self.model.model.eval()
 
@@ -180,8 +169,7 @@ class Training():
 
         # Start building the pipeline
         pipeline = source
-    
-# QUESTION FOR JAN: How come I can put infinite pad here? What is different compared to training?
+
         pipeline += gp.Pad(raw, None)
 
         pipeline += gp.Normalize(raw)
@@ -206,9 +194,6 @@ class Training():
 
         pipeline += gp.Scan(scan_request)
 
-# QUESTION FOR JAN: when I increase the size of this ROI I get the message 
-# "Requested TARGET ROI ... lies entirely outside of upstream ROI" 
-# See below for more comments on this
         total_request = gp.BatchRequest()
         total_request.add(raw, gp.Coordinate((44,325,600))*self.validate_data.voxel_size)
         total_request.add(prediction, gp.Coordinate((44,325,600))*self.validate_data.voxel_size)

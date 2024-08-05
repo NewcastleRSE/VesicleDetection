@@ -119,7 +119,6 @@ class EMData(Dataset):
             # Return a dictionary containing data
             return {"raw": raw_data, "gt": gt_data}
         
-# QUESTION FOR JAN: Would you recommend, instead of doing this, to define a BatchFilter to create the target array during the pipeline?
     def create_target(self, data_type = 'int64'):
         """ 
             Create new zarr array, 'target', that is a copy of 'gt' but with different dtype. 
