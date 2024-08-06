@@ -28,16 +28,16 @@ class Training():
             predict_shape_z = self.validate_data.raw_data.shape[0]
         
         if self.input_shape[1] >= self.validate_data.raw_data.shape[1]:
-            predict_shape_x = self.input_shape[1]
+            predict_shape_y = self.input_shape[1]
         else:
-            predict_shape_x = self.validate_data.raw_data.shape[1]
+            predict_shape_y = self.validate_data.raw_data.shape[1]
 
         if self.input_shape[2] >= self.validate_data.raw_data.shape[2]:
-            predict_shape_y = self.input_shape[2]
+            predict_shape_x = self.input_shape[2]
         else:
-            predict_shape_y = self.validate_data.raw_data.shape[2]
+            predict_shape_x = self.validate_data.raw_data.shape[2]
 
-        self.predict_shape = (predict_shape_z, predict_shape_x, predict_shape_y)
+        self.predict_shape = (predict_shape_z, predict_shape_y, predict_shape_x)
 
         # Switch to world units for use with gunpowder
         input_shape = gp.Coordinate(self.input_shape)
@@ -189,7 +189,7 @@ class Training():
         # Start building the pipeline
         pipeline = source
 
-        pipeline += gp.Pad(raw, None)
+        pipeline += gp.Pad(raw, (self.input_size-self.output_size)/2)
 
         pipeline += gp.Normalize(raw)
 
