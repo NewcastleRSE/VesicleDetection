@@ -80,6 +80,14 @@ class EMData(Dataset):
                     self.resolution = self.raw_data.attrs["resolution"]
                 else:
                     raise FileNotFoundError(f"{self.mode} raw data requires resolution attribute.")
+                
+                if "axes" in self.raw_data.attrs:
+                    if self.raw_data.attrs["axes"] == ['z','y','x']:
+                        self.axes = self.raw_data.attrs["axes"]
+                    else:
+                        raise ValueError(f"Raw data axes {self.raw_data.attrs["axes"]}. Axes must be ['z','y','x'].")
+                else:
+                    raise FileNotFoundError(f"{self.mode} raw data requires axes attribute with orientation [z,y,x].")
 
                 # Check whether raw and gt data have same attributes
                 if self.mode == "train" or self.mode == "validate":
