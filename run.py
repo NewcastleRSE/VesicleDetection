@@ -25,11 +25,15 @@ class Run():
                                                             batch_size = batch_size)
 
         # run the training pipeline for interations
+        print(f"Starting training for {iterations} iterations...")
         with gp.build(pipeline):
             for i in range(iterations):
                 batch = pipeline.request_batch(request)
 
+        print("Training complete!")
+
         # Predict on the validation data
+        print("Starting validation...")
         ret = self.training.validate_pipeline()
 
         return batch, ret
@@ -37,7 +41,11 @@ class Run():
 
 if __name__ == "__main__":
 
-    run = Run("data/17_1A_data.zarr", clahe=True)
+    data_path = input("Provide path to zarr container: ")
+
+    print(f"Loading data from {data_path}...")
+
+    run = Run(data_path, clahe=True)
 
     batch, ret = run.run_training(iterations=1)
 
