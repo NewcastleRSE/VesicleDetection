@@ -72,8 +72,11 @@ class EMData(Dataset):
 
                 # Check if target folder exists and assign target_data_path and target_data
                 if 'target' in os.listdir(self.zarr_path + "/" + self.mode):
+                    self.has_target = True
                     self.target_data_path = f"/{self.mode}/target"
                     self.target_data = self.data[self.mode]["target"]
+                else:
+                    self.has_target = False
 
                 # Check if the data has a mask
                 if self.has_mask:
@@ -170,6 +173,8 @@ class EMData(Dataset):
                     exposure.equalize_adapthist(raw[z], kernel_size=128)
                     for z in range(raw.shape[0])
                 ], dtype=np.float32)
-        f['raw_clahe'] = raw_clahe 
+        f['raw_clahe'] = raw_clahe
         for atr in f['raw'].attrs:
-            f['raw_clahe'].attrs[atr] = f['raw'].attrs[atr] 
+            f['raw_clahe'].attrs[atr] = f['raw'].attrs[atr]
+
+        self.has_target = True 

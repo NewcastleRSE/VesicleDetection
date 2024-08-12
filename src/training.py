@@ -16,8 +16,10 @@ class Training():
         self.zarr_path = zarr_path
         self.training_data = EMData(self.zarr_path, "train", clahe=clahe)
         self.validate_data = EMData(self.zarr_path, "validate", clahe=clahe)
-        self.training_data.create_target()
-        self.validate_data.create_target()
+        if not self.training_data.has_target:
+            self.training_data.create_target()
+        if not self.validate_data.has_target:
+            self.validate_data.create_target()
         self.input_shape = input_shape
         self.output_shape = output_shape
 
