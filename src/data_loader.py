@@ -1,6 +1,8 @@
 import os
 import zarr
 import gunpowder as gp
+import numpy as np 
+from skimage import exposure
 from torch.utils.data import Dataset
 
 
@@ -47,15 +49,24 @@ class EMData(Dataset):
                     self.raw_data_path = f"/{self.mode}/raw_clahe"
                     self.raw_data = self.data[self.mode]["raw_clahe"]
                 else:
-                    print(f"'raw_clahe' file not found in {self.zarr_path}/{self.mode}. Will use 'raw' file instead.")
-                    self.raw_data_path = f"/{self.mode}/raw"
-                    self.raw_data = self.data[self.mode]["raw"]
+                    make_clahe = input(f"'raw_clahe' file not found in {self.zarr_path}/{self.mode}. Would you like to create a clahe file? (y/n) ")
+                    if make_clahe.lower() == 'y':
+                        self.create_clahe()
+                        self.raw_data_path = f"/{self.mode}/raw_clahe"
+                        self.raw_data = self.data[self.mode]["raw_clahe"]
+                    else:
+                        self.raw_data_path = f"/{self.mode}/raw"
+                        self.raw_data = self.data[self.mode]["raw"]
             else:
                 self.raw_data_path = f"/{self.mode}/raw"
                 self.raw_data = self.data[self.mode]["raw"]
 
             # If train or validate, assign ground-truth data
             if self.mode == "train" or self.mode == "validate":
+
+                if 'gt' not in os.listdir(self.zarr_path + "/" + self.mode):
+                    raise FileNotFoundError(f"Ground-truth file is missing in {self.zarr_path}/{self.mode}")
+                
                 self.gt_data_path = f"/{self.mode}/gt"
                 self.gt_data = self.data[self.mode]["gt"]
 
@@ -148,3 +159,17 @@ class EMData(Dataset):
         
         self.target_data_path = f"/{self.mode}/target"
         self.target_data = self.data[self.mode]["target"]
+
+    def create_clahe(self):
+        """
+            Create a clahe version of the raw data.
+        """
+        f = zarr.open(self.zarr_path + "/" + self.mode , mode='r+')
+        raw = f['raw'] 
+        raw_clahe = np.array([
+                    exposure.equalize_adapthist(raw[z], kernel_size=128)
+                    for z in range(raw.shape[0])
+                ], dtype=np.float32)
+        f['raw_clahe'] = raw_clahe 
+        for atr in f['raw'].attrs:
+            f['raw_clahe'].attrs[atr] = f['raw'].attrs[atr] 

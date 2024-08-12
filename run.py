@@ -45,7 +45,14 @@ if __name__ == "__main__":
 
     print(f"Loading data from {data_path}...")
 
-    run = Run(data_path, clahe=True)
+    use_clahe = input("Would you like to use clahe data? (y/n): ")
+
+    if use_clahe.lower() == 'y':
+        CLAHE = True
+    else:
+        CLAHE = False
+
+    run = Run(data_path, clahe=CLAHE)
 
     batch, ret = run.run_training(iterations=1)
 
