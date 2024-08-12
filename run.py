@@ -1,8 +1,9 @@
 import math
 import gunpowder as gp
+import napari
 
 from src.training import Training
-from src.visualisation import imshow
+from src.visualisation import imshow, imshow_napari
 
 class Run():
 
@@ -53,7 +54,6 @@ if __name__ == "__main__":
         CLAHE = False
 
     run = Run(data_path, clahe=CLAHE)
-
     batch, ret = run.run_training(iterations=1)
 
     # Output the predicitions for background, PC+ and PC-
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     pos_pred = ret['prediction'].data[1,:,:,:]
     neg_pred = ret['prediction'].data[2,:,:,:]
     total = back_pred + pos_pred + neg_pred
-
+    
     print(total)
 
-    imshow(ret['raw'].data)
+    imshow_napari(ret)

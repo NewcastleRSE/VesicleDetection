@@ -3,5 +3,6 @@ numpy == 1.26.4
 torch 
 zarr 
 matplotlib 
+napari[all]
 funlib-learn-torch @ git+https://github.com/funkelab/funlib.learn.torch.git
 -e .
