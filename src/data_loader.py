@@ -162,6 +162,7 @@ class EMData(Dataset):
         
         self.target_data_path = f"/{self.mode}/target"
         self.target_data = self.data[self.mode]["target"]
+        self.has_target = True 
 
     def create_clahe(self):
         """
@@ -176,5 +177,3 @@ class EMData(Dataset):
         f['raw_clahe'] = raw_clahe
         for atr in f['raw'].attrs:
             f['raw_clahe'].attrs[atr] = f['raw'].attrs[atr]
-
-        self.has_target = True 

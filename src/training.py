@@ -1,20 +1,22 @@
+import torch
 import gunpowder as gp
 
 from src.data_loader import EMData
-from src.model import Model
+from src.model import DetectionModel
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
 
 class Training():
     def __init__(self,
                 zarr_path: str,
                 clahe=False,
+                training_has_mask = False,
                 input_shape = (44, 96, 96),
-                output_shape = (4,56,56)
+                output_shape = (24,56,56)
                 ):
           
         # Load in the data and create target arrays
         self.zarr_path = zarr_path
-        self.training_data = EMData(self.zarr_path, "train", clahe=clahe)
+        self.training_data = EMData(self.zarr_path, "train", clahe=clahe, has_mask = training_has_mask)
         self.validate_data = EMData(self.zarr_path, "validate", clahe=clahe)
         if not self.training_data.has_target:
             self.training_data.create_target()
@@ -61,11 +63,15 @@ class Training():
         else:
             self.channel_dims = 1
 
-        self.model = Model(
+        self.detection_model = DetectionModel(
                     raw_num_channels=self.raw_channels,
                     input_shape = self.input_shape,
                     voxel_size = self.training_data.voxel_size
                     )
+        
+        self.loss = torch.nn.CrossEntropyLoss(weight= torch.FloatTensor([0.01, 1.0, 1.0]))
+
+        self.optimizer = torch.optim.Adam(self.detection_model.parameters(), lr = 1e-5)
 
     def training_pipeline(
                 self,
@@ -76,7 +82,7 @@ class Training():
                 ):
 
         # Set the model to train mode
-        self.model.model.train()
+        self.detection_model.train()
 
         # Define the gunpowder arrays
         raw = gp.ArrayKey('RAW')
@@ -116,8 +122,14 @@ class Training():
         # Start building the pipeline
         pipeline = source
 
-        pipeline += gp.Pad(raw, None)
-        pipeline += gp.Pad(target, (self.input_size-self.output_size)/2 )
+        # Create BatchRequest and add arrays with corresponding ROIs
+        request = gp.BatchRequest()
+        request.add(raw, self.input_size)
+        request.add(target, self.output_size)
+        request.add(prediction, self.output_size)
+
+        #pipeline += gp.Pad(raw, None)
+        #pipeline += gp.Pad(target, (self.input_size-self.output_size)/2 )
         pipeline += gp.Normalize(raw)
         if self.training_data.has_mask:
             pipeline += gp.RandomLocation(min_masked=0.1, mask=self.training_data.mask_data)
@@ -140,13 +152,14 @@ class Training():
         pipeline += gp.Stack(batch_size)
 
         pipeline += gp.torch.Train(
-            model = self.model.model,
-            loss = self.model.loss,
-            optimizer = self.model.optimizer,
-            inputs = {'input': raw},
+            model = self.detection_model,
+            loss = self.loss,
+            optimizer = self.optimizer,
+            inputs = {'x': raw},
             loss_inputs = loss_inputs,
             outputs={0: prediction},
-            save_every=100)
+            save_every=100
+            )
 
         # This needs to be completed later!
         if snapshot_every > 0:
@@ -156,17 +169,11 @@ class Training():
             if self.channel_dims == 0:
                 pipeline += RemoveChannelDim(raw)
 
-        # Create BatchRequest and add arrays with corresponding ROIs
-        request = gp.BatchRequest()
-        request.add(raw, self.input_size)
-        request.add(target, self.output_size)
-        request.add(prediction, self.output_size)
-
-        return pipeline, request
+        return pipeline, request, raw, target, prediction
     
     def validate_pipeline(self):
     
-        self.model.model.eval()
+        self.detection_model.eval()
 
         # Define the gunpowder arrays
         raw = gp.ArrayKey('RAW')
@@ -191,7 +198,8 @@ class Training():
         # Start building the pipeline
         pipeline = source
 
-        pipeline += gp.Pad(raw, (self.input_size-self.output_size)/2)
+        pipeline += gp.Pad(raw, None)
+        #pipeline += gp.Pad(raw, (self.input_size-self.output_size)/2)
 
         pipeline += gp.Normalize(raw)
 
@@ -202,8 +210,8 @@ class Training():
         pipeline += AddChannelDim(raw)
 
         pipeline += gp.torch.Predict(
-                model=self.model.model,
-                inputs={'input': raw},
+                model=self.detection_model,
+                inputs={'x': raw},
                 outputs={0: prediction})
         
         # Remove the created batch dimension
