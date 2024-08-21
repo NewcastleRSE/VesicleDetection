@@ -3,6 +3,7 @@ import gunpowder as gp
 
 from src.data_loader import EMData
 from src.model import DetectionModel
+from src.loss import CustomCrossEntropy
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
 
 class Training():
@@ -69,7 +70,7 @@ class Training():
                     voxel_size = self.training_data.voxel_size
                     )
         
-        self.loss = torch.nn.CrossEntropyLoss(weight= torch.FloatTensor([0.01, 1.0, 1.0]))
+        self.loss = CustomCrossEntropy(weight = [0.01, 1.0, 1.0])
 
         self.optimizer = torch.optim.Adam(self.detection_model.parameters(), lr = 1e-5)
 
@@ -127,12 +128,14 @@ class Training():
         request.add(raw, self.input_size)
         request.add(target, self.output_size)
         request.add(prediction, self.output_size)
+        if self.training_data.has_mask:
+            request.add(mask, self.output_size) 
 
         #pipeline += gp.Pad(raw, None)
         #pipeline += gp.Pad(target, (self.input_size-self.output_size)/2 )
         pipeline += gp.Normalize(raw)
         if self.training_data.has_mask:
-            pipeline += gp.RandomLocation(min_masked=0.1, mask=self.training_data.mask_data)
+            pipeline += gp.RandomLocation(min_masked=0.1, mask=mask)
         else:
             pipeline += gp.RandomLocation()
         

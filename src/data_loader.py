@@ -81,7 +81,7 @@ class EMData(Dataset):
                 # Check if the data has a mask
                 if self.has_mask:
                     if 'mask' in os.listdir(self.zarr_path + "/" + self.mode):
-                        self.mask_data_path = f"{self.zarr_path}/{self.mode}/mask"
+                        self.mask_data_path = f"/{self.mode}/mask"
                         self.mask_data = self.data[self.mode]["mask"]
                     else:
                         raise FileNotFoundError(f"Mask file is missing in {self.zarr_path}/{self.mode}")

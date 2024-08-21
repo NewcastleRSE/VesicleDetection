@@ -22,7 +22,7 @@ class Run():
             gp.ElasticAugment((1, 10, 10), (0, 0.1, 0.1), (0, math.pi/2))
         ]
 
-    def run_training(self, batch_size= 2, iterations = 1):
+    def run_training(self, batch_size=1, iterations=1):
 
         # Get pipeline and request for training
         pipeline, request, raw, target, prediction = self.training.training_pipeline(augmentations=self.augmentations,
@@ -33,6 +33,8 @@ class Run():
         with gp.build(pipeline):
             for i in range(iterations):
                 batch = pipeline.request_batch(request)
+                if i % 10 == 0 and i>0:
+                    print(f"Completed training iteration {i}")
 
         print("Training complete!")
 
@@ -56,8 +58,15 @@ if __name__ == "__main__":
     else:
         CLAHE = False
 
-    run = Run(data_path, clahe=CLAHE)
-    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=1)
+    has_mask = input("Does your training data have a mask? (y/n): ")
+
+    if has_mask.lower() == 'y':
+        HAS_MASK = True
+    else:
+        HAS_MASK = False
+
+    run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
+    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=20)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
     # Output the predicitions for background, PC+ and PC-
@@ -83,12 +92,12 @@ if __name__ == "__main__":
     non_zero_indices = np.nonzero(back_pred)
 
     #print(len(non_zero_indices[0]))
-    print(len(set(non_zero_indices[0])))
-    print(set(non_zero_indices[0]))
-    print(len(set(non_zero_indices[1])))
-    print(set(non_zero_indices[1]))
-    print(len(set(non_zero_indices[2])))
-    print(set(non_zero_indices[2]))
+    # print(len(set(non_zero_indices[0])))
+    # print(set(non_zero_indices[0]))
+    # print(len(set(non_zero_indices[1])))
+    # print(set(non_zero_indices[1]))
+    # print(len(set(non_zero_indices[2])))
+    # print(set(non_zero_indices[2]))
 
     #print(ret['prediction'].data[0,10:34,20:305,20:580])
     
@@ -103,29 +112,5 @@ if __name__ == "__main__":
     # f['Negative'] = neg_pred 
 
     total_train = back_train + pos_train + neg_train
-
-    # print('--------------------------'*5)
-    # print(back_train) 
-    # print('--------------------------'*5)
-    # print(pos_train) 
-    # print('--------------------------'*5)
-    # print(neg_train) 
-    # print('--------------------------'*5)
-    # print(total_train)
-
-    # if not 1 in back_train:
-    #     print('its not all background!')
-    # else:
-    #     print('All background, sad!')
-
-    # if not 0 in pos_train: 
-    #     print("pos train success") 
-    # else:
-    #     print("pos train all 0")
-
-    # if not 0 in neg_train: 
-    #     print("neg train success") 
-    # else:
-    #     print("neg train all 0")
 
     #imshow_napari(ret)
