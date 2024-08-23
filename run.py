@@ -1,5 +1,6 @@
 import math
 import numpy as np
+import torch 
 import zarr 
 import gunpowder as gp
 import napari
@@ -33,8 +34,10 @@ class Run():
         with gp.build(pipeline):
             for i in range(iterations):
                 batch = pipeline.request_batch(request)
-                if i % 10 == 0 and i>0:
+                if i % 100 == 0 and i>0:
                     print(f"Completed training iteration {i}")
+                    print("Loss: ", batch.loss)
+                    #print(self.training.loss(torch.tensor(batch[prediction].data), torch.tensor(batch[target].data)))
 
         print("Training complete!")
 
@@ -66,30 +69,44 @@ if __name__ == "__main__":
         HAS_MASK = False
 
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
-    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=20)
+    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=1)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
     # Output the predicitions for background, PC+ and PC-
     # Total should be 1 everywhere. Something seems to be wrong!
 
-    back_pred = ret['prediction'].data[0,:,:,:]
-    pos_pred = ret['prediction'].data[1,:,:,:]
-    neg_pred = ret['prediction'].data[2,:,:,:]
+    probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
+
+    #print(probs.shape)
+
+    back_pred = probs[0,10:34,20:305,20:580]
+    pos_pred = probs[1,10:34,20:305,20:580]
+    neg_pred = probs[2,10:34,20:305,20:580]
+
     total_pred = back_pred + pos_pred + neg_pred
     
-    pred_shape = ret['prediction'].data.shape
-
     print(batch)
-    #print(ret) 
-    print(pred_shape)
+    
 
-    print(np.sum(back_pred))
-    print(np.sum(pos_pred))
-    print(np.sum(neg_pred))
-    print(np.sum(total_pred))
+    print("---------"*10)
+    print(back_pred)
+
+    print("---------"*10)
+    print(pos_pred)
+
+    print("---------"*10)
+    print(neg_pred)
+
+    # print("---------"*10)
+    # print(total_pred)
+
+    # print(np.sum(back_pred))
+    # print(np.sum(pos_pred))
+    # print(np.sum(neg_pred))
+    # print(np.sum(total_pred))
     #print(back_pred)
 
-    non_zero_indices = np.nonzero(back_pred)
+    #non_zero_indices = np.nonzero(back_pred)
 
     #print(len(non_zero_indices[0]))
     # print(len(set(non_zero_indices[0])))
@@ -99,18 +116,10 @@ if __name__ == "__main__":
     # print(len(set(non_zero_indices[2])))
     # print(set(non_zero_indices[2]))
 
-    #print(ret['prediction'].data[0,10:34,20:305,20:580])
-    
-
-    back_train = batch[train_prediction].data[0,0,:,:,:]
-    pos_train = batch[train_prediction].data[0,1,:,:,:]
-    neg_train = batch[train_prediction].data[0,2,:,:,:]
 
     # f = zarr.open(data_path + "/validate", mode='r+')
     # f['Background'] = back_pred
     # f['Positive'] = pos_pred
     # f['Negative'] = neg_pred 
-
-    total_train = back_train + pos_train + neg_train
 
     #imshow_napari(ret)

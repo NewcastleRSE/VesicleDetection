@@ -39,7 +39,7 @@ class DetectionModel(torch.nn.Module):
             voxel_size = voxel_size
         )
 
-        self.head = ConvPass(fmaps, 3, [(1, 1, 1)], activation='Softmax')
+        self.head = ConvPass(fmaps, 3, [(1, 1, 1)], activation=None)
 
         self.total_model = torch.nn.Sequential(
                     self.unet,
