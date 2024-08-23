@@ -52,8 +52,6 @@ if __name__ == "__main__":
 
     data_path = input("Provide path to zarr container: ")
 
-    print(f"Loading data from {data_path}...")
-
     use_clahe = input("Would you like to use clahe data? (y/n): ")
 
     if use_clahe.lower() == 'y':
@@ -68,8 +66,10 @@ if __name__ == "__main__":
     else:
         HAS_MASK = False
 
+    print(f"Loading data from {data_path}...")
+
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
-    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=1)
+    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=500)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
     # Output the predicitions for background, PC+ and PC-
@@ -79,9 +79,9 @@ if __name__ == "__main__":
 
     #print(probs.shape)
 
-    back_pred = probs[0,10:34,20:305,20:580]
-    pos_pred = probs[1,10:34,20:305,20:580]
-    neg_pred = probs[2,10:34,20:305,20:580]
+    back_pred = probs[0,10:34,20:305,20:580].detach().numpy()
+    pos_pred = probs[1,10:34,20:305,20:580].detach().numpy()
+    neg_pred = probs[2,10:34,20:305,20:580].detach().numpy()
 
     total_pred = back_pred + pos_pred + neg_pred
     
@@ -118,8 +118,14 @@ if __name__ == "__main__":
 
 
     # f = zarr.open(data_path + "/validate", mode='r+')
-    # f['Background'] = back_pred
-    # f['Positive'] = pos_pred
-    # f['Negative'] = neg_pred 
+    # f['Background_masked'] = back_pred
+    # f['Positive_masked'] = pos_pred
+    # f['Negative_masked'] = neg_pred 
+
+    # # Copy over attributes from target to predictions
+    # for atr in f['target'].attrs:
+    #     f['Background_masked'].attrs[atr] = f['target'].attrs[atr]
+    #     f['Positive_masked'].attrs[atr] = f['target'].attrs[atr]
+    #     f['Negative_masked'].attrs[atr] = f['target'].attrs[atr]
 
     #imshow_napari(ret)
