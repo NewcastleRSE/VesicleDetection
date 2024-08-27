@@ -2,7 +2,7 @@ import torch
 import gunpowder as gp
 
 from src.data_loader import EMData
-from src.model import DetectionModel
+from src.model import DetectionModel, UnetOutputShape
 from src.loss import CustomCrossEntropy
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
 
@@ -11,8 +11,8 @@ class Training():
                 zarr_path: str,
                 clahe=False,
                 training_has_mask = False,
-                input_shape = (44, 96, 96),
-                output_shape = (24,56,56)
+                input_shape = (44, 96, 96)
+                #output_shape = (24,56,56)
                 ):
           
         # Load in the data and create target arrays
@@ -24,6 +24,30 @@ class Training():
         if not self.validate_data.has_target:
             self.validate_data.create_target()
         self.input_shape = input_shape
+
+        # Check if there are multiple channels within the raw data.
+        # This shouldn't be the case for us as EM data is 'colourblind'.
+        if len(self.training_data.raw_data.shape) == 3:
+            self.raw_channels = 1
+        elif len(self.training_data.raw_data.shape) == 4:
+            self.raw_channels = self.training_data.raw_data.shape[0]
+
+        if self.raw_channels == 1:
+            self.channel_dims = 0
+        else:
+            self.channel_dims = 1
+
+        self.detection_model = DetectionModel(
+                    raw_num_channels=self.raw_channels,
+                    input_shape = self.input_shape,
+                    voxel_size = self.training_data.voxel_size
+                    )
+        
+        output_shape = UnetOutputShape(
+                                        model = self.detection_model,
+                                        input_shape = self.input_shape
+                                       )
+        
         self.output_shape = output_shape
 
         # Obtain shape for prediciton
@@ -51,24 +75,6 @@ class Training():
         self.input_size = self.training_data.voxel_size * input_shape
         self.output_size = self.training_data.voxel_size * output_shape
         self.predict_size = self.validate_data.voxel_size * predict_shape
-
-        # Check if there are multiple channels within the raw data.
-        # This shouldn't be the case for us as EM data is 'colourblind'.
-        if len(self.training_data.raw_data.shape) == 3:
-            self.raw_channels = 1
-        elif len(self.training_data.raw_data.shape) == 4:
-            self.raw_channels = self.training_data.raw_data.shape[0]
-
-        if self.raw_channels == 1:
-            self.channel_dims = 0
-        else:
-            self.channel_dims = 1
-
-        self.detection_model = DetectionModel(
-                    raw_num_channels=self.raw_channels,
-                    input_shape = self.input_shape,
-                    voxel_size = self.training_data.voxel_size
-                    )
         
         self.loss = CustomCrossEntropy(weight = [0.01, 1.0, 1.0])
 

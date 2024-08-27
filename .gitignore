@@ -171,3 +171,5 @@ data/
 
 # Notebook folder 
 Notebook/ 
+
+Model_checkpoints/
