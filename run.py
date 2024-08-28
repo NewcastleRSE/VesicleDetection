@@ -5,6 +5,8 @@ import zarr
 import gunpowder as gp
 import napari
 
+from datetime import datetime
+
 from src.training import Training
 from src.visualisation import imshow, imshow_napari
 
@@ -37,7 +39,6 @@ class Run():
                 if i % 100 == 0 and i>0:
                     print(f"Completed training iteration {i}")
                     print("Loss: ", batch.loss)
-                    #print(self.training.loss(torch.tensor(batch[prediction].data), torch.tensor(batch[target].data)))
 
         print("Training complete!")
 
@@ -69,15 +70,10 @@ if __name__ == "__main__":
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
-    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=500)
+    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=1)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
-    # Output the predicitions for background, PC+ and PC-
-    # Total should be 1 everywhere. Something seems to be wrong!
-
     probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
-
-    #print(probs.shape)
 
     back_pred = probs[0,10:34,20:305,20:580].detach().numpy()
     pos_pred = probs[1,10:34,20:305,20:580].detach().numpy()
@@ -116,16 +112,18 @@ if __name__ == "__main__":
     # print(len(set(non_zero_indices[2])))
     # print(set(non_zero_indices[2]))
 
+    date = datetime.today().strftime('%d_%m_%Y')
 
-    # f = zarr.open(data_path + "/validate", mode='r+')
-    # f['Background_masked'] = back_pred
-    # f['Positive_masked'] = pos_pred
-    # f['Negative_masked'] = neg_pred 
 
-    # # Copy over attributes from target to predictions
-    # for atr in f['target'].attrs:
-    #     f['Background_masked'].attrs[atr] = f['target'].attrs[atr]
-    #     f['Positive_masked'].attrs[atr] = f['target'].attrs[atr]
-    #     f['Negative_masked'].attrs[atr] = f['target'].attrs[atr]
+    f = zarr.open(data_path + "/validate", mode='r+')
+    f[f'Predictions/{date}/Background'] = back_pred
+    f[f'Predictions/{date}/Positive'] = pos_pred
+    f[f'Predictions/{date}/Negative'] = neg_pred 
+
+    # Copy over attributes from target to predictions
+    for atr in f['target'].attrs:
+        f[f'Predictions/{date}/Background'].attrs[atr] = f['target'].attrs[atr]
+        f[f'Predictions/{date}/Positive'].attrs[atr] = f['target'].attrs[atr]
+        f[f'Predictions/{date}/Negative'].attrs[atr] = f['target'].attrs[atr]
 
     #imshow_napari(ret)
