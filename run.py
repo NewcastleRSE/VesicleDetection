@@ -80,6 +80,14 @@ if __name__ == "__main__":
         HAS_MASK = False
 
     print("-----")
+    visualise = input("Would you like to visualise the prediction? (y/n): ")
+
+    while visualise.lower() != 'y' and visualise.lower() != 'n':
+        print("-----")
+        print("Invalid input. Please enter 'y' or 'n' only.")
+        visualise = input("Would you like to visualise the prediction? (y/n): ")
+
+    print("-----")
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
@@ -97,24 +105,16 @@ if __name__ == "__main__":
     date = datetime.today().strftime('%d_%m_%Y')
 
     # Save the validation prediction in zarr dictionary. 
-    f = zarr.open(data_path + "/validate", mode='r+')
-    f[f'Predictions/{date}/Background'] = back_pred
-    f[f'Predictions/{date}/Positive'] = pos_pred
-    f[f'Predictions/{date}/Negative'] = neg_pred 
+    # f = zarr.open(data_path + "/validate", mode='r+')
+    # f[f'Predictions/{date}/Background'] = back_pred
+    # f[f'Predictions/{date}/Positive'] = pos_pred
+    # f[f'Predictions/{date}/Negative'] = neg_pred 
 
-    # Copy over attributes from target to predictions
-    for atr in f['target'].attrs:
-        f[f'Predictions/{date}/Background'].attrs[atr] = f['target'].attrs[atr]
-        f[f'Predictions/{date}/Positive'].attrs[atr] = f['target'].attrs[atr]
-        f[f'Predictions/{date}/Negative'].attrs[atr] = f['target'].attrs[atr]
-
-    print("-----")
-    visualise = input("Would you like to visualise the prediction? (y/n): ")
-
-    while visualise.lower() != 'y' and visualise.lower() != 'n':
-        print("-----")
-        print("Invalid input. Please enter 'y' or 'n' only.")
-        visualise = input("Would you like to visualise the prediction? (y/n): ")
+    # # Copy over attributes from target to predictions
+    # for atr in f['target'].attrs:
+    #     f[f'Predictions/{date}/Background'].attrs[atr] = f['target'].attrs[atr]
+    #     f[f'Predictions/{date}/Positive'].attrs[atr] = f['target'].attrs[atr]
+    #     f[f'Predictions/{date}/Negative'].attrs[atr] = f['target'].attrs[atr]
 
     if visualise.lower() == 'y':
         imshow_napari_validation(data_path, date)

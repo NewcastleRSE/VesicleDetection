@@ -1,5 +1,7 @@
+import os
 import torch
 import gunpowder as gp
+from datetime import datetime
 
 from src.data_loader import EMData
 from src.model import DetectionModel, UnetOutputShape
@@ -83,6 +85,8 @@ class Training():
 
         self.optimizer = torch.optim.Adam(self.detection_model.parameters(), lr = 1e-5)
 
+        self.date = datetime.today().strftime('%d_%m_%Y')
+
     def training_pipeline(
                 self,
                 augmentations: list,
@@ -90,6 +94,9 @@ class Training():
                 snapshot_every = 0,
                 outdir = None
                 ):
+        
+        # Create directory for saving model checkpoints
+        os.makedirs(f'Model_checkpoints/{self.date}', exist_ok=True)
 
         # Set the model to train mode
         self.detection_model.train()
@@ -170,7 +177,8 @@ class Training():
             inputs = {'x': raw},
             loss_inputs = loss_inputs,
             outputs={0: prediction},
-            save_every=500
+            checkpoint_basename = f'Model_checkpoints/{self.date}/model',
+            save_every=50
             )
 
         # This needs to be completed later!
@@ -224,7 +232,8 @@ class Training():
         pipeline += gp.torch.Predict(
                 model=self.detection_model,
                 inputs={'x': raw},
-                outputs={0: prediction})
+                outputs={0: prediction}
+                )
         
         # Remove the created batch dimension
         pipeline += RemoveChannelDim(raw)
