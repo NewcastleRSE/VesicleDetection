@@ -11,7 +11,7 @@ class Training():
                 zarr_path: str,
                 clahe=False,
                 training_has_mask = False,
-                input_shape = (44, 96, 96)
+                input_shape = (30, 96, 96)
                 #output_shape = (24,56,56)
                 ):
           
@@ -43,12 +43,13 @@ class Training():
                     voxel_size = self.training_data.voxel_size
                     )
         
-        output_shape = UnetOutputShape(
+        output_shape, border = UnetOutputShape(
                                         model = self.detection_model,
                                         input_shape = self.input_shape
                                        )
-        
+
         self.output_shape = output_shape
+        self.border = border
 
         # Obtain shape for prediciton
         if self.input_shape[0] >= self.validate_data.raw_data.shape[0]:
@@ -72,9 +73,11 @@ class Training():
         input_shape = gp.Coordinate(self.input_shape)
         output_shape = gp.Coordinate(self.output_shape)
         predict_shape = gp.Coordinate(self.predict_shape)
+        border_shape = gp.Coordinate(self.border)
         self.input_size = self.training_data.voxel_size * input_shape
         self.output_size = self.training_data.voxel_size * output_shape
         self.predict_size = self.validate_data.voxel_size * predict_shape
+        self.border_size = self.validate_data.voxel_size * border_shape
         
         self.loss = CustomCrossEntropy(weight = [0.01, 1.0, 1.0])
 
@@ -167,7 +170,7 @@ class Training():
             inputs = {'x': raw},
             loss_inputs = loss_inputs,
             outputs={0: prediction},
-            save_every=100
+            save_every=500
             )
 
         # This needs to be completed later!
@@ -234,7 +237,7 @@ class Training():
 
         total_request = gp.BatchRequest()
         total_request.add(raw, self.predict_size)
-        total_request.add(prediction, self.predict_size)
+        total_request.add(prediction, self.predict_size - self.border_size*2)
 
 
         with gp.build(pipeline):

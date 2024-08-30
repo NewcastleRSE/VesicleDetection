@@ -1,18 +1,31 @@
 import matplotlib.pyplot as plt
+import numpy as np
 import napari
+import zarr
 
-# Create a function to images
-def imshow(image):
-    if len(image.shape) == 3:
-        plt.figure(figsize=(10,10))
-        for i in range(4):
-            plt.subplot(1,4,i+1)
-            plt.imshow(image[i])
-        plt.show()
+def imshow_napari_validation(data_path, date):
+    f = zarr.open(data_path + "/validate", mode='r')
+    raw_data = f['raw_clahe'][:,:,:]
+    target_data = f['target'][:,:,:]
+    background_pred = f[f'Predictions/{date}/Background'][:,:,:]
+    positive_pred = f[f'Predictions/{date}/Positive'][:,:,:]
+    negative_pred = f[f'Predictions/{date}/Negative'][:,:,:]
 
-def imshow_napari(ret):
+    # Obtain difference between input shape and output shape, to allow alignment in napari
+    padding = [int((raw_data.shape[0]-positive_pred.shape[0])/2), 
+               int((raw_data.shape[1]-positive_pred.shape[1])/2), 
+               int((raw_data.shape[2]- positive_pred.shape[2])/2)]
+
     viewer = napari.Viewer()
-    viewer.add_image(data=ret['raw'].data, name='Raw')
-    #viewer.add_image(data=zarr_data.target_data, name='Target', colormap='green', blending='additive')
-
+    viewer.add_image(data=raw_data, name='Raw')
+    viewer.add_image(data=target_data, name='Target', blending='additive', colormap='inferno')
+    viewer.add_image(data=positive_pred, name='Positive', blending='additive', colormap='yellow', translate=padding)
+    viewer.add_image(data=negative_pred, name='Negative', blending='additive', colormap='red', translate=padding)
     napari.run()
+
+if __name__ == "__main__":
+
+    data_path = input("Provide the path to zarr container: ")
+    date = input("Provide the prediction date (d_m_Y): ")
+
+    imshow_napari_validation(data_path=data_path, date=date) 

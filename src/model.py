@@ -27,8 +27,8 @@ class DetectionModel(torch.nn.Module):
 
         self.downsample_factors = downsample_factors
 
-        self.kernel_size_down = [[(3,)*dims, (3,)*dims]]*levels
-        self.kernel_size_up = [[(3,)*dims, (3,)*dims]]*(levels - 1)
+        self.kernel_size_down = [[(2,) + (3,)*(dims-1), (2,) + (3,)*(dims-1)]]*levels
+        self.kernel_size_up = [[(2,) + (3,)*(dims-1), (2,) + (3,)*(dims-1)]]*(levels - 1)
 
         torch.manual_seed(18) 
         
@@ -117,7 +117,7 @@ def UnetOutputShape(
     print(f"The full prediction of the validation image will have a border of shape {border}.")
     print("-----"*5)
     
-    return conv_out_5
+    return conv_out_5, border
 
 def ConvOutputShape(input_shape,
                     kernel_size,

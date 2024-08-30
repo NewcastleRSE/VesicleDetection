@@ -8,7 +8,7 @@ import napari
 from datetime import datetime
 
 from src.training import Training
-from src.visualisation import imshow, imshow_napari
+from src.visualisation import imshow_napari_validation
 
 class Run():
 
@@ -53,68 +53,50 @@ if __name__ == "__main__":
 
     data_path = input("Provide path to zarr container: ")
 
+    print("-----")
     use_clahe = input("Would you like to use clahe data? (y/n): ")
+
+    while use_clahe.lower() != 'y' and use_clahe.lower() != 'n':
+        print("-----")
+        print("Invalid input. Please enter 'y' or 'n' only.")
+        use_clahe = input("Would you like to use clahe data? (y/n): ")
 
     if use_clahe.lower() == 'y':
         CLAHE = True
-    else:
+    elif use_clahe.lower() == 'n':
         CLAHE = False
 
+    print("-----")
     has_mask = input("Does your training data have a mask? (y/n): ")
+
+    while has_mask.lower() != 'y' and has_mask.lower() != 'n':
+        print("-----")
+        print("Invalid input. Please enter 'y' or 'n' only.")
+        has_mask = input("Does your training data have a mask? (y/n): ")
 
     if has_mask.lower() == 'y':
         HAS_MASK = True
     else:
         HAS_MASK = False
 
+    print("-----")
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
     batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=1)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
+    # Convert logits output from data to probabilities using softmax.
     probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
 
-    back_pred = probs[0,10:34,20:305,20:580].detach().numpy()
-    pos_pred = probs[1,10:34,20:305,20:580].detach().numpy()
-    neg_pred = probs[2,10:34,20:305,20:580].detach().numpy()
-
-    total_pred = back_pred + pos_pred + neg_pred
-    
-    print(batch)
-    
-
-    print("---------"*10)
-    print(back_pred)
-
-    print("---------"*10)
-    print(pos_pred)
-
-    print("---------"*10)
-    print(neg_pred)
-
-    # print("---------"*10)
-    # print(total_pred)
-
-    # print(np.sum(back_pred))
-    # print(np.sum(pos_pred))
-    # print(np.sum(neg_pred))
-    # print(np.sum(total_pred))
-    #print(back_pred)
-
-    #non_zero_indices = np.nonzero(back_pred)
-
-    #print(len(non_zero_indices[0]))
-    # print(len(set(non_zero_indices[0])))
-    # print(set(non_zero_indices[0]))
-    # print(len(set(non_zero_indices[1])))
-    # print(set(non_zero_indices[1]))
-    # print(len(set(non_zero_indices[2])))
-    # print(set(non_zero_indices[2]))
+    # Convert prediction probabilities into numpy arrays
+    back_pred = probs[0,:,:,:].detach().numpy()
+    pos_pred = probs[1,:,:,:].detach().numpy()
+    neg_pred = probs[2,:,:,:].detach().numpy()
 
     date = datetime.today().strftime('%d_%m_%Y')
 
-
+    # Save the validation prediction in zarr dictionary. 
     f = zarr.open(data_path + "/validate", mode='r+')
     f[f'Predictions/{date}/Background'] = back_pred
     f[f'Predictions/{date}/Positive'] = pos_pred
@@ -126,4 +108,13 @@ if __name__ == "__main__":
         f[f'Predictions/{date}/Positive'].attrs[atr] = f['target'].attrs[atr]
         f[f'Predictions/{date}/Negative'].attrs[atr] = f['target'].attrs[atr]
 
-    #imshow_napari(ret)
+    print("-----")
+    visualise = input("Would you like to visualise the prediction? (y/n): ")
+
+    while visualise.lower() != 'y' and visualise.lower() != 'n':
+        print("-----")
+        print("Invalid input. Please enter 'y' or 'n' only.")
+        visualise = input("Would you like to visualise the prediction? (y/n): ")
+
+    if visualise.lower() == 'y':
+        imshow_napari_validation(data_path, date)
