@@ -3,13 +3,13 @@ import numpy as np
 import napari
 import zarr
 
-def imshow_napari_validation(data_path, date):
+def imshow_napari_validation(data_path, save_location):
     f = zarr.open(data_path + "/validate", mode='r')
     raw_data = f['raw_clahe'][:,:,:]
     target_data = f['target'][:,:,:]
-    background_pred = f[f'Predictions/{date}/Background'][:,:,:]
-    positive_pred = f[f'Predictions/{date}/Positive'][:,:,:]
-    negative_pred = f[f'Predictions/{date}/Negative'][:,:,:]
+    background_pred = f[f'{save_location}/Background'][:,:,:]
+    positive_pred = f[f'{save_location}/Positive'][:,:,:]
+    negative_pred = f[f'{save_location}/Negative'][:,:,:]
 
     # Obtain difference between input shape and output shape, to allow alignment in napari
     padding = [int((raw_data.shape[0]-positive_pred.shape[0])/2), 
@@ -28,4 +28,4 @@ if __name__ == "__main__":
     data_path = input("Provide the path to zarr container: ")
     date = input("Provide the prediction date (d_m_Y): ")
 
-    imshow_napari_validation(data_path=data_path, date=date) 
+    imshow_napari_validation(data_path=data_path, save_location= 'Predictions/' + date) 

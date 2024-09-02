@@ -1,3 +1,4 @@
+import os
 import math
 import numpy as np
 import torch 
@@ -9,6 +10,7 @@ from datetime import datetime
 
 from src.training import Training
 from src.visualisation import imshow_napari_validation
+from src.directory_organisor import create_unique_directory_file
 
 class Run():
 
@@ -25,11 +27,12 @@ class Run():
             gp.ElasticAugment((1, 10, 10), (0, 0.1, 0.1), (0, math.pi/2))
         ]
 
-    def run_training(self, batch_size=1, iterations=1):
+    def run_training(self, batch_size=1, iterations=1, checkpoint_path = None,):
 
         # Get pipeline and request for training
         pipeline, request, raw, target, prediction = self.training.training_pipeline(augmentations=self.augmentations,
-                                                            batch_size = batch_size)
+                                                            batch_size = batch_size, 
+                                                            checkpoint_path = checkpoint_path)
 
         # run the training pipeline for interations
         print(f"Starting training for {iterations} iterations...")
@@ -47,7 +50,6 @@ class Run():
         ret = self.training.validate_pipeline()
 
         return batch, ret, raw, target, prediction 
-
 
 if __name__ == "__main__":
 
@@ -80,6 +82,26 @@ if __name__ == "__main__":
         HAS_MASK = False
 
     print("-----")
+    load_model = input("Would you like to continue training a previous model? (y/n): ")
+
+    while load_model.lower() != 'y' and load_model.lower() != 'n':
+        print("-----")
+        print("Invalid input. Please enter 'y' or 'n' only.")
+        load_model = input("Would you like to continue training a previous model? (y/n): ")
+
+    if load_model.lower() == 'y':
+        model_checkpoint_path = input("Provide path to the models' checkpoints: ")
+
+        while not os.path.exists(model_checkpoint_path):
+            print("-----")
+            print("Could not find model checkpoints. Please try again.")
+            model_checkpoint_path = input("Provide path to the models' checkpoints: ")
+    
+    else:
+        model_checkpoint_path = None 
+
+
+    print("-----")
     visualise = input("Would you like to visualise the prediction? (y/n): ")
 
     while visualise.lower() != 'y' and visualise.lower() != 'n':
@@ -91,7 +113,9 @@ if __name__ == "__main__":
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
-    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, iterations=1)
+    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, 
+                                                                             iterations=10000, 
+                                                                             checkpoint_path = model_checkpoint_path)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
     # Convert logits output from data to probabilities using softmax.
@@ -104,17 +128,20 @@ if __name__ == "__main__":
 
     date = datetime.today().strftime('%d_%m_%Y')
 
+    save_path = create_unique_directory_file(data_path + f'/validate/Predictions/{date}')
+    save_location = os.path.relpath(save_path, data_path + '/validate')
+
     # Save the validation prediction in zarr dictionary. 
-    # f = zarr.open(data_path + "/validate", mode='r+')
-    # f[f'Predictions/{date}/Background'] = back_pred
-    # f[f'Predictions/{date}/Positive'] = pos_pred
-    # f[f'Predictions/{date}/Negative'] = neg_pred 
+    f = zarr.open(data_path + "/validate", mode='r+')
+    f[save_location + '/Background'] = back_pred
+    f[save_location + '/Positive'] = pos_pred
+    f[save_location + '/Negative'] = neg_pred 
 
     # # Copy over attributes from target to predictions
-    # for atr in f['target'].attrs:
-    #     f[f'Predictions/{date}/Background'].attrs[atr] = f['target'].attrs[atr]
-    #     f[f'Predictions/{date}/Positive'].attrs[atr] = f['target'].attrs[atr]
-    #     f[f'Predictions/{date}/Negative'].attrs[atr] = f['target'].attrs[atr]
+    for atr in f['target'].attrs:
+        f[save_location + '/Background'].attrs[atr] = f['target'].attrs[atr]
+        f[save_location + '/Positive'].attrs[atr] = f['target'].attrs[atr]
+        f[save_location + '/Negative'].attrs[atr] = f['target'].attrs[atr]
 
     if visualise.lower() == 'y':
-        imshow_napari_validation(data_path, date)
+        imshow_napari_validation(data_path, save_location)

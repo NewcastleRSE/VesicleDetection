@@ -7,6 +7,7 @@ from src.data_loader import EMData
 from src.model import DetectionModel, UnetOutputShape
 from src.loss import CustomCrossEntropy
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
+from src.directory_organisor import create_unique_directory_file
 
 class Training():
     def __init__(self,
@@ -92,11 +93,17 @@ class Training():
                 augmentations: list,
                 batch_size: int,
                 snapshot_every = 0,
+                checkpoint_path = None,
                 outdir = None
                 ):
         
-        # Create directory for saving model checkpoints
-        os.makedirs(f'Model_checkpoints/{self.date}', exist_ok=True)
+        if checkpoint_path == None:
+            # Create directory for saving model checkpoints
+            self.checkpoint_path = create_unique_directory_file(f'Model_checkpoints/{self.date}')
+            os.makedirs(self.checkpoint_path, exist_ok=True)
+
+        else: 
+            self.checkpoint_path = checkpoint_path
 
         # Set the model to train mode
         self.detection_model.train()
@@ -177,8 +184,8 @@ class Training():
             inputs = {'x': raw},
             loss_inputs = loss_inputs,
             outputs={0: prediction},
-            checkpoint_basename = f'Model_checkpoints/{self.date}/model',
-            save_every=50
+            checkpoint_basename = self.checkpoint_path + '/model',
+            save_every=100
             )
 
         # This needs to be completed later!
