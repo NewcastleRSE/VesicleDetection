@@ -89,10 +89,10 @@ class Training():
 
     def training_pipeline(
                 self,
-                augmentations: list,
-                batch_size: int,
-                snapshot_every = 0,
-                checkpoint_path = None,
+                augmentations = TRAINING_CONFIG.augmentations,
+                batch_size = TRAINING_CONFIG.batch_size,
+                snapshot_every = TRAINING_CONFIG.snapshot_every,
+                checkpoint_path = TRAINING_CONFIG.checkpoint_path,
                 outdir = None
                 ):
         

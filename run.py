@@ -21,24 +21,12 @@ class Run():
             ):
 
         self.zarr_path = zarr_path
-
-        self.training = Training(
-                                zarr_path = self.zarr_path, 
-                                clahe = TRAINING_CONFIG.clahe,
-                                training_has_mask = TRAINING_CONFIG.has_mask, 
-                                input_shape = TRAINING_CONFIG.input_shape
-                                )
-
+        self.training = Training(zarr_path = self.zarr_path)
         self.training_stats = TrainingStatistics()
         
     def run_training(self): 
         # Get pipeline and request for training
-        pipeline, request = self.training.training_pipeline(
-                                                            augmentations = TRAINING_CONFIG.augmentations,
-                                                            batch_size = TRAINING_CONFIG.batch_size, 
-                                                            snapshot_every= TRAINING_CONFIG.snapshot_every,
-                                                            checkpoint_path = TRAINING_CONFIG.checkpoint_path
-                                                            )
+        pipeline, request = self.training.training_pipeline()
 
         # run the training pipeline for interations
         print(f"Starting training for {TRAINING_CONFIG.iterations} iterations...")
