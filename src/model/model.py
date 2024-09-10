@@ -111,11 +111,11 @@ def UnetOutputShape(
     border = tuple(((np.array(input_shape) - np.array(conv_out_5))/2).astype(int))
 
 
-    print("-----"*5)
-    print(f"The model will divide the image into samples of shape (in voxels) {input_shape} " \
-            f"and return a corresponding prediction with shape {conv_out_5}.")
-    print(f"The full prediction of the validation image will have a border of shape {border}.")
-    print("-----"*5)
+    # print("-----"*5)
+    # print(f"The model will divide the image into samples of shape (in voxels) {input_shape} " \
+    #         f"and return a corresponding prediction with shape {conv_out_5}.")
+    # print(f"The full prediction of the validation image will have a border of shape {border}.")
+    # print("-----"*5)
     
     return conv_out_5, border
 

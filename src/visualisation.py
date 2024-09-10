@@ -20,8 +20,8 @@ def imshow_napari_validation(data_path, save_location):
     viewer = napari.Viewer()
     viewer.add_image(data=raw_data, name='Raw')
     viewer.add_image(data=target_data, name='Target', blending='additive', colormap='inferno')
-    viewer.add_image(data=positive_pred, name='Positive', blending='additive', colormap='yellow', translate=padding)
-    viewer.add_image(data=negative_pred, name='Negative', blending='additive', colormap='red', translate=padding)
+    # viewer.add_image(data=positive_pred, name='Positive', blending='additive', colormap='yellow', translate=padding)
+    # viewer.add_image(data=negative_pred, name='Negative', blending='additive', colormap='red', translate=padding)
     viewer.add_image(data=hough_transformed, name='Hough Transformed', blending='additive', colormap='green', translate=padding)
     napari.run()
 

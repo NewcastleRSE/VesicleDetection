@@ -5,12 +5,16 @@ import torch
 import zarr 
 import gunpowder as gp
 import napari
+import time
+from tqdm import tqdm
 
 from datetime import datetime
 
-from src.training import Training
+from src.processing.training import Training, TrainingStatistics
+from src.processing.predict import Prediction
 from src.visualisation import imshow_napari_validation
 from src.directory_organisor import create_unique_directory_file
+from src.processing.post_processing.hough_detector import HoughDetector
 
 class Run():
 
@@ -22,6 +26,7 @@ class Run():
             ):
         self.zarr_path = zarr_path
         self.training = Training(self.zarr_path, clahe=clahe, training_has_mask=training_has_mask)
+        self.training_stats = TrainingStatistics()
         self.augmentations = [
             gp.SimpleAugment(transpose_only=(1, 2)),
             gp.ElasticAugment((1, 10, 10), (0, 0.1, 0.1), (0, math.pi/2))
@@ -30,26 +35,27 @@ class Run():
     def run_training(self, batch_size=1, iterations=1, checkpoint_path = None,):
 
         # Get pipeline and request for training
-        pipeline, request, raw, target, prediction = self.training.training_pipeline(augmentations=self.augmentations,
+        pipeline, request = self.training.training_pipeline(augmentations=self.augmentations,
                                                             batch_size = batch_size, 
                                                             checkpoint_path = checkpoint_path)
 
         # run the training pipeline for interations
         print(f"Starting training for {iterations} iterations...")
         with gp.build(pipeline):
-            for i in range(iterations):
+            for i in tqdm(range(iterations)):
+                time.sleep(0.01)
                 batch = pipeline.request_batch(request)
-                if i % 100 == 0 and i>0:
-                    print(f"Completed training iteration {i}")
-                    print("Loss: ", batch.loss)
-
-        print("Training complete!")
+                train_time = batch.profiling_stats.get_timing_summary('Train', 'process').times[-1]
+                self.training_stats.add_stats(iteration=i, loss=batch.loss, time= train_time)
 
         # Predict on the validation data
-        print("Starting validation...")
-        ret = self.training.validate_pipeline()
+        print(f"Training complete! Starting validation...")
+        predictor = Prediction(data = self.training.validate_data, 
+                               model = self.training.detection_model,
+                               input_shape = self.training.input_shape)
+        ret = predictor.predict_pipeline()
 
-        return batch, ret, raw, target, prediction 
+        return batch, ret
 
 if __name__ == "__main__":
 
@@ -113,9 +119,9 @@ if __name__ == "__main__":
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path, clahe=CLAHE, training_has_mask=HAS_MASK)
-    batch, ret, train_raw, train_target, train_prediction = run.run_training(batch_size=1, 
-                                                                             iterations=10000, 
-                                                                             checkpoint_path = model_checkpoint_path)
+    batch, ret = run.run_training(batch_size=1, 
+                                iterations=20000, 
+                                checkpoint_path = model_checkpoint_path)
     # Check for convergence issue with batch size (Jan's UNet doesn't have batch normalisation)
 
     # Convert logits output from data to probabilities using softmax.
@@ -142,6 +148,18 @@ if __name__ == "__main__":
         f[save_location + '/Background'].attrs[atr] = f['target'].attrs[atr]
         f[save_location + '/Positive'].attrs[atr] = f['target'].attrs[atr]
         f[save_location + '/Negative'].attrs[atr] = f['target'].attrs[atr]
+
+    # Post-processing
+    hough_detection = HoughDetector(pred_pos=f[save_location + '/Positive'], 
+                                    pred_neg=f[save_location + '/Negative'], 
+                                    combine_pos_neg=True)
+
+    hough_detection.process(maxima_threshold=50.0)
+
+    f[save_location + '/Hough_transformed'] = hough_detection.prediction_result
+
+    for atr in f[save_location + '/Positive'].attrs:
+        f[save_location + '/Hough_transformed'].attrs[atr] = f[save_location + '/Positive'].attrs[atr]
 
     if visualise.lower() == 'y':
         imshow_napari_validation(data_path, save_location)

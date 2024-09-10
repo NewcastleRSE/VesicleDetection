@@ -4,8 +4,8 @@ import gunpowder as gp
 from datetime import datetime
 
 from src.data_loader import EMData
-from src.model import DetectionModel, UnetOutputShape
-from src.loss import CustomCrossEntropy
+from src.model.model import DetectionModel, UnetOutputShape
+from src.model.loss import CustomCrossEntropy
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
 from src.directory_organisor import create_unique_directory_file
 
@@ -15,7 +15,6 @@ class Training():
                 clahe=False,
                 training_has_mask = False,
                 input_shape = (30, 96, 96)
-                #output_shape = (24,56,56)
                 ):
           
         # Load in the data and create target arrays
@@ -196,9 +195,9 @@ class Training():
             if self.channel_dims == 0:
                 pipeline += RemoveChannelDim(raw)
 
-        return pipeline, request, raw, target, prediction
+        return pipeline, request
     
-    def validate_pipeline(self):
+    def predict_pipeline(self):
     
         self.detection_model.eval()
 
@@ -264,6 +263,14 @@ class Training():
                 }
         return ret
 
+class TrainingStatistics:
 
-    def load_trained_model(self):
-        pass
+    def __init__(self):
+        self.iterations = []
+        self.losses = []
+        self.times = []
+
+    def add_stats(self, iteration, loss, time):
+        self.iterations.append(iteration)
+        self.losses.append(loss)
+        self.times.append(time) 
