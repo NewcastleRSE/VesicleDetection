@@ -3,8 +3,9 @@ import scipy.ndimage
 import skimage.feature 
 import skimage.morphology
 import zarr
-
 import gunpowder as gp
+
+from config.load_configs import POST_PROCESSING_CONFIG
 
 class HoughCandidate:
         def __init__(self, location, maxima, label):
@@ -15,7 +16,7 @@ class HoughCandidate:
 
 class HoughDetector:
 
-    def __init__(self, pred_pos, pred_neg, combine_pos_neg : bool):
+    def __init__(self, pred_pos, pred_neg, combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg):
 
         self.pred_pos = pred_pos
         self.pred_neg = pred_neg
@@ -171,7 +172,7 @@ class HoughDetector:
                             label=candidate.label
                             )
     
-    def process(self, maxima_threshold):
+    def process(self, maxima_threshold = POST_PROCESSING_CONFIG.maxima_threshold):
 
         # Define reject map. This will be updated with "True" values 
         # In locations where vesicles have been detected.
@@ -214,7 +215,7 @@ if __name__ == "__main__":
     
     hough_detection = HoughDetector(pred_pos=pred_pos, pred_neg = pred_neg, combine_pos_neg=True)
 
-    hough_detection.process(maxima_threshold=50.0)
+    hough_detection.process()
 
     print(len(hough_detection.accepted_candidates))
     print(len(hough_detection.candidates))
