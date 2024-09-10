@@ -5,4 +5,5 @@ zarr == 2.18.2
 matplotlib == 3.9.2
 napari[all] 
 funlib-learn-torch @ git+https://github.com/funkelab/funlib.learn.torch.git
+PyYAML == 6.0.2
 -e .

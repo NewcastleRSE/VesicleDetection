@@ -1,0 +1,13 @@
+augmentations:
+- gp.SimpleAugment(transpose_only=(1,2))
+- gp.ElasticAugment((1,10,10), (0,0.1,0.1), (0,math.pi/2))
+batch_size: 1
+checkpoint_path: null
+clahe: true
+has_mask: true
+input_shape: !!python/tuple
+- 30
+- 96
+- 96
+iterations: 100
+snapshot_every: 0

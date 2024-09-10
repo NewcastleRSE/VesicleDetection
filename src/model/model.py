@@ -3,16 +3,17 @@ import numpy as np
 import math
 from funlib.learn.torch.models import UNet, ConvPass
 
+from config.load_configs import MODEL_CONFIG
+
 class DetectionModel(torch.nn.Module):
     def __init__(self,
                 raw_num_channels,
-                input_shape,
                 voxel_size,
-                fmaps = 32,
-                fmap_inc_factor = 5,
-                downsample_factors = [(1,2,2),(1,2,2)],
-                padding = 'valid',
-                constant_upsample = True
+                fmaps = MODEL_CONFIG.fmaps,
+                fmap_inc_factor = MODEL_CONFIG.fmap_inc_factors,
+                downsample_factors = MODEL_CONFIG.downsample_factors,
+                padding = MODEL_CONFIG.padding,
+                constant_upsample = MODEL_CONFIG.constant_upsample
                 ):
         
         # Change for an-isotropic data 

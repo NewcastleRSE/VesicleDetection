@@ -8,13 +8,14 @@ from src.model.model import DetectionModel, UnetOutputShape
 from src.model.loss import CustomCrossEntropy
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
 from src.directory_organisor import create_unique_directory_file
+from config.load_configs import TRAINING_CONFIG
 
 class Training():
     def __init__(self,
                 zarr_path: str,
-                clahe=False,
-                training_has_mask = False,
-                input_shape = (30, 96, 96)
+                clahe = TRAINING_CONFIG.clahe,
+                training_has_mask = TRAINING_CONFIG.has_mask,
+                input_shape = TRAINING_CONFIG.input_shape
                 ):
           
         # Load in the data and create target arrays
@@ -41,7 +42,6 @@ class Training():
 
         self.detection_model = DetectionModel(
                     raw_num_channels=self.raw_channels,
-                    input_shape = self.input_shape,
                     voxel_size = self.training_data.voxel_size
                     )
         
@@ -197,71 +197,71 @@ class Training():
 
         return pipeline, request
     
-    def predict_pipeline(self):
+    # def predict_pipeline(self):
     
-        self.detection_model.eval()
+    #     self.detection_model.eval()
 
-        # Define the gunpowder arrays
-        raw = gp.ArrayKey('RAW')
-        prediction = gp.ArrayKey('PREDICTION')
+    #     # Define the gunpowder arrays
+    #     raw = gp.ArrayKey('RAW')
+    #     prediction = gp.ArrayKey('PREDICTION')
 
-        # Create scan request (i.e. where each prediction will happen)
-        scan_request = gp.BatchRequest()
-        scan_request.add(raw, self.input_size)
-        scan_request.add(prediction, self.output_size)
+    #     # Create scan request (i.e. where each prediction will happen)
+    #     scan_request = gp.BatchRequest()
+    #     scan_request.add(raw, self.input_size)
+    #     scan_request.add(prediction, self.output_size)
 
-        # Create the source node for pipeline
-        source = gp.ZarrSource(
-                self.validate_data.zarr_path,
-                {
-                    raw: self.validate_data.raw_data_path
-                },
-                {
-                    raw: gp.ArraySpec(interpolatable=True)
-                }
-            )
+    #     # Create the source node for pipeline
+    #     source = gp.ZarrSource(
+    #             self.validate_data.zarr_path,
+    #             {
+    #                 raw: self.validate_data.raw_data_path
+    #             },
+    #             {
+    #                 raw: gp.ArraySpec(interpolatable=True)
+    #             }
+    #         )
 
-        # Start building the pipeline
-        pipeline = source
+    #     # Start building the pipeline
+    #     pipeline = source
 
-        pipeline += gp.Pad(raw, None)
-        #pipeline += gp.Pad(raw, (self.input_size-self.output_size)/2)
+    #     pipeline += gp.Pad(raw, None)
+    #     #pipeline += gp.Pad(raw, (self.input_size-self.output_size)/2)
 
-        pipeline += gp.Normalize(raw)
+    #     pipeline += gp.Normalize(raw)
 
-        if self.channel_dims == 0:
-            pipeline += AddChannelDim(raw)
+    #     if self.channel_dims == 0:
+    #         pipeline += AddChannelDim(raw)
         
-        # This accounts for us having a batch with size 1
-        pipeline += AddChannelDim(raw)
+    #     # This accounts for us having a batch with size 1
+    #     pipeline += AddChannelDim(raw)
 
-        pipeline += gp.torch.Predict(
-                model=self.detection_model,
-                inputs={'x': raw},
-                outputs={0: prediction}
-                )
+    #     pipeline += gp.torch.Predict(
+    #             model=self.detection_model,
+    #             inputs={'x': raw},
+    #             outputs={0: prediction}
+    #             )
         
-        # Remove the created batch dimension
-        pipeline += RemoveChannelDim(raw)
-        pipeline += RemoveChannelDim(prediction)
+    #     # Remove the created batch dimension
+    #     pipeline += RemoveChannelDim(raw)
+    #     pipeline += RemoveChannelDim(prediction)
         
-        if self.channel_dims == 0:
-            pipeline += RemoveChannelDim(raw)
+    #     if self.channel_dims == 0:
+    #         pipeline += RemoveChannelDim(raw)
 
-        pipeline += gp.Scan(scan_request)
+    #     pipeline += gp.Scan(scan_request)
 
-        total_request = gp.BatchRequest()
-        total_request.add(raw, self.predict_size)
-        total_request.add(prediction, self.predict_size - self.border_size*2)
+    #     total_request = gp.BatchRequest()
+    #     total_request.add(raw, self.predict_size)
+    #     total_request.add(prediction, self.predict_size - self.border_size*2)
 
 
-        with gp.build(pipeline):
-            batch = pipeline.request_batch(total_request)
-            ret = {
-                    'raw': batch[raw],
-                    'prediction': batch[prediction]
-                }
-        return ret
+    #     with gp.build(pipeline):
+    #         batch = pipeline.request_batch(total_request)
+    #         ret = {
+    #                 'raw': batch[raw],
+    #                 'prediction': batch[prediction]
+    #             }
+    #     return ret
 
 class TrainingStatistics:
 

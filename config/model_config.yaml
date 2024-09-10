@@ -1,0 +1,13 @@
+constant_upsample: true
+downsample_factors:
+- !!python/tuple
+  - 1
+  - 2
+  - 2
+- !!python/tuple
+  - 1
+  - 2
+  - 2
+fmap_inc_factors: 5
+fmaps: 32
+padding: valid
