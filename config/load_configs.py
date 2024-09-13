@@ -30,6 +30,7 @@ class TrainingConfigs:
         self.has_mask = config['has_mask']
         self.input_shape = config['input_shape']
         self.iterations = config["iterations"]
+        self.save_every = config["save_every"]
         self.snapshot_every = config['snapshot_every']
         self.val_every = config['val_every']
         

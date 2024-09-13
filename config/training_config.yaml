@@ -10,6 +10,7 @@ input_shape: !!python/tuple
 - 30
 - 96
 - 96
-iterations: 10
+iterations: 1000
+save_every: 100
 snapshot_every: 0
-val_every: 5
+val_every: 100

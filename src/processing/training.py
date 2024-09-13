@@ -184,7 +184,7 @@ class Training():
             loss_inputs = loss_inputs,
             outputs={0: prediction},
             checkpoint_basename = self.checkpoint_path + '/model',
-            save_every=100
+            save_every= TRAINING_CONFIG.save_every
             )
 
         # This needs to be completed later!
