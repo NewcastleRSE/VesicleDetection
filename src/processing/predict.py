@@ -64,12 +64,6 @@ class Prediction:
         self.border_size = self.data.voxel_size * border_shape
 
     def predict_pipeline(self):
-
-        print("-----"*5)
-        print(f"The model will divide the image into samples of shape (in voxels) {self.input_shape} " \
-                f"and return a corresponding prediction with shape {self.output_shape}.")
-        print(f"The full prediction of the validation image will have a border of shape {self.border}.")
-        print("-----"*5)
     
         self.detection_model.eval()
 
@@ -134,3 +128,10 @@ class Prediction:
                     'prediction': batch[prediction]
                 }
         return ret
+    
+    def print_border_message(self):
+        print("-----"*5)
+        print(f"The model will divide the image into samples of shape (in voxels) {self.input_shape} " \
+                f"and return a corresponding prediction with shape {self.output_shape}.")
+        print(f"The full prediction of the validation image will have a border of shape {self.border}.")
+        print("-----"*5)

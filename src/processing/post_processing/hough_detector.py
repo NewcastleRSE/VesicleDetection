@@ -13,22 +13,21 @@ class HoughCandidate:
             self.score = maxima 
             self.label = label
 
-
 class HoughDetector:
 
-    def __init__(self, pred_pos, pred_neg, combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg):
+    def __init__(self, pred_pos, pred_neg, voxel_size, combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg):
 
-        self.pred_pos = pred_pos
-        self.pred_neg = pred_neg
-        self.pred_pos_data = self.pred_pos[:,:,:]
-        self.pred_neg_data = self.pred_neg[:,:,:]
+        # self.pred_pos = pred_pos
+        # self.pred_neg = pred_neg
+        self.pred_pos_data = pred_pos
+        self.pred_neg_data = pred_neg
         self.combine_pos_neg = combine_pos_neg
+        self.voxel_size = voxel_size
         self.balls = {}
 
     def hough_prediction(self, threshold):
 
-        self.voxel_size = gp.Coordinate(self.pred_pos.attrs['resolution'])
-        self.roi = self.pred_pos.shape
+        self.roi = self.pred_pos_data.shape
 
         # Define our spherical kernel for convolution
         diameter = np.array([300.0, 300.0, 300.0])
@@ -161,7 +160,7 @@ class HoughDetector:
     def prediction(self, accepted_candidates):
 
         # Start with all background
-        self.prediction_result = np.zeros(self.pred_pos.shape, dtype=np.int64)
+        self.prediction_result = np.zeros(self.pred_pos_data.shape, dtype=np.int64)
         
         # Add labels as per accepted candidates. 
         for candidate in accepted_candidates:
@@ -176,7 +175,7 @@ class HoughDetector:
 
         # Define reject map. This will be updated with "True" values 
         # In locations where vesicles have been detected.
-        reject_map = np.zeros(self.pred_pos.shape, dtype=bool)
+        reject_map = np.zeros(self.pred_pos_data.shape, dtype=bool)
 
         self.hough_prediction(maxima_threshold)
 

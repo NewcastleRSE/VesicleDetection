@@ -20,6 +20,8 @@ training_config["batch_size"] = 1
 training_config["checkpoint_path"] = None 
 training_config["snapshot_every"] = 0 
 training_config["iterations"] = 100
+training_config["val_every"] = 100
+training_config["best_score_name"] = 'fscore'
 
 post_processing_config = dict()
 post_processing_config["combine_pos_neg"] = True

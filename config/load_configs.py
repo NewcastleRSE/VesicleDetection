@@ -24,12 +24,14 @@ class TrainingConfigs:
 
         self.augmentations = [eval(aug) for aug in config['augmentations']]
         self.batch_size = config["batch_size"]
+        self.best_score_name = config["best_score_name"]
         self.checkpoint_path = config["checkpoint_path"]
         self.clahe = config['clahe']
         self.has_mask = config['has_mask']
         self.input_shape = config['input_shape']
         self.iterations = config["iterations"]
         self.snapshot_every = config['snapshot_every']
+        self.val_every = config['val_every']
         
         for key, value in zip(config.keys(), config.values()):
              if not hasattr(TrainingConfigs, key):

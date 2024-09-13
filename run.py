@@ -1,32 +1,36 @@
 import os
-import torch 
 import zarr 
 import gunpowder as gp
+import numpy as np
 
 from tqdm import tqdm
 from datetime import datetime
 
 from src.processing.training import Training, TrainingStatistics
-from src.processing.predict import Prediction
 from src.visualisation import imshow_napari_validation
 from src.directory_organisor import create_unique_directory_file
 from src.processing.post_processing.hough_detector import HoughDetector
 from config.load_configs import TRAINING_CONFIG
+from src.processing.validate import Validations, validate
 
 class Run():
 
     def __init__(
             self,
-            zarr_path: str
+            zarr_path: str,
+            best_score_name = TRAINING_CONFIG.best_score_name
             ):
 
         self.zarr_path = zarr_path
         self.training = Training(zarr_path = self.zarr_path)
         self.training_stats = TrainingStatistics()
+        self.validations = Validations()
+        self.best_score_name = best_score_name
+        self.best_score = 0.0
         
-    def run_training(self): 
+    def run_training(self, checkpoint_path=None): 
         # Get pipeline and request for training
-        pipeline, request = self.training.training_pipeline()
+        pipeline, request = self.training.training_pipeline(checkpoint_path=checkpoint_path)
 
         # run the training pipeline for interations
         print(f"Starting training for {TRAINING_CONFIG.iterations} iterations...")
@@ -36,14 +40,45 @@ class Run():
                 train_time = batch.profiling_stats.get_timing_summary('Train', 'process').times[-1]
                 self.training_stats.add_stats(iteration=i, loss=batch.loss, time= train_time)
 
-        # Predict on the validation data
-        print(f"Training complete! Starting validation...")
-        predictor = Prediction(data = self.training.validate_data, 
-                               model = self.training.detection_model,
-                               input_shape = self.training.input_shape)
-        ret = predictor.predict_pipeline()
+                # Validate model during training 
+                if (i % TRAINING_CONFIG.val_every == 0) and (i>0):
+                    print("\n Running validation...")
+                    scores, predictions = validate(
+                                                validation_data=self.training.validate_data,
+                                                model = self.training.detection_model,
+                                                input_shape = self.training.input_shape
+                                                )
+                    self.validations.add_validation(iteration=i, scores=scores, predictions=predictions)
 
-        return batch, ret
+                    print(scores)
+
+                    if scores[f"{self.best_score_name}_average"] >= self.best_score:
+                        self.best_score = scores[f"{self.best_score_name}_average"]
+                        self.best_prediction = predictions 
+                        self.best_iteration = i
+
+                    print("Resuming training...")
+            
+            print("Running final validation...")
+            scores, predictions = validate(
+                                        validation_data=self.training.validate_data,
+                                        model = self.training.detection_model,
+                                        input_shape = self.training.input_shape
+                                        )
+            self.validations.add_validation(iteration=i, scores=scores, predictions=predictions)
+
+            print(scores)
+
+            if scores[f"{self.best_score_name}_average"] >= self.best_score:
+                self.best_score = scores[f"{self.best_score_name}_average"]
+                self.best_prediction = predictions 
+                self.best_iteration = TRAINING_CONFIG.iterations
+
+        if self.best_score == 0 or self.best_score == np.nan:
+            return self.best_score, 'N/A', 'N/A'
+        
+        else:
+            return self.best_score, self.best_prediction, self.best_iteration
 
 if __name__ == "__main__":
 
@@ -68,7 +103,6 @@ if __name__ == "__main__":
     else:
         model_checkpoint_path = None 
 
-
     print("-----")
     visualise = input("Would you like to visualise the prediction? (y/n): ")
 
@@ -81,44 +115,35 @@ if __name__ == "__main__":
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path)
-    batch, ret = run.run_training()
+    best_score, best_prediction, best_iteration = run.run_training(checkpoint_path=model_checkpoint_path)
 
-    # Convert logits output from data to probabilities using softmax.
-    probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
+    if best_prediction == 'N/A':
+        print("No prediction obtained. Model needs more training.")
 
-    # Convert prediction probabilities into numpy arrays
-    back_pred = probs[0,:,:,:].detach().numpy()
-    pos_pred = probs[1,:,:,:].detach().numpy()
-    neg_pred = probs[2,:,:,:].detach().numpy()
+    else:
+        print(f"Best {TRAINING_CONFIG.best_score_name}: {best_score}")
+        print(f"Best iteration: {best_iteration}")
+        # Load predictions
+        pos_pred = best_prediction['Positive']
+        neg_pred = best_prediction['Negative']
+        hough_pred = best_prediction['Hough_transformed']
 
-    date = datetime.today().strftime('%d_%m_%Y')
+        date = datetime.today().strftime('%d_%m_%Y')
 
-    save_path = create_unique_directory_file(data_path + f'/validate/Predictions/{date}')
-    save_location = os.path.relpath(save_path, data_path + '/validate')
+        save_path = create_unique_directory_file(data_path + f'/validate/Predictions/{date}')
+        save_location = os.path.relpath(save_path, data_path + '/validate')
 
-    # Save the validation prediction in zarr dictionary. 
-    f = zarr.open(data_path + "/validate", mode='r+')
-    f[save_location + '/Background'] = back_pred
-    f[save_location + '/Positive'] = pos_pred
-    f[save_location + '/Negative'] = neg_pred 
+        # Save the validation prediction in zarr dictionary. 
+        f = zarr.open(data_path + "/validate", mode='r+')
+        f[save_location + '/Hough_transformed'] = hough_pred
+        f[save_location + '/Positive'] = pos_pred
+        f[save_location + '/Negative'] = neg_pred 
 
-    # # Copy over attributes from target to predictions
-    for atr in f['target'].attrs:
-        f[save_location + '/Background'].attrs[atr] = f['target'].attrs[atr]
-        f[save_location + '/Positive'].attrs[atr] = f['target'].attrs[atr]
-        f[save_location + '/Negative'].attrs[atr] = f['target'].attrs[atr]
+        # Copy over attributes from target to predictions
+        for atr in f['target'].attrs:
+            f[save_location + '/Positive'].attrs[atr] = f['target'].attrs[atr]
+            f[save_location + '/Negative'].attrs[atr] = f['target'].attrs[atr]
+            f[save_location + '/Hough_transformed'].attrs[atr] = f['target'].attrs[atr]
 
-    # Post-processing
-    hough_detection = HoughDetector(pred_pos=f[save_location + '/Positive'], 
-                                    pred_neg=f[save_location + '/Negative'], 
-                                    combine_pos_neg=True)
-
-    hough_detection.process(maxima_threshold=50.0)
-
-    f[save_location + '/Hough_transformed'] = hough_detection.prediction_result
-
-    for atr in f[save_location + '/Positive'].attrs:
-        f[save_location + '/Hough_transformed'].attrs[atr] = f[save_location + '/Positive'].attrs[atr]
-
-    if visualise.lower() == 'y':
-        imshow_napari_validation(data_path, save_location)
+        if visualise.lower() == 'y':
+            imshow_napari_validation(data_path, save_location)
