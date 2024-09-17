@@ -27,6 +27,7 @@ class Run():
         self.validations = Validations()
         self.best_score_name = best_score_name
         self.best_score = 0.0
+        self.candidate = None
         
     def run_training(self, checkpoint_path=None): 
         # Get pipeline and request for training
@@ -43,12 +44,15 @@ class Run():
                 # Validate model during training 
                 if (i % TRAINING_CONFIG.val_every == 0) and (i>0):
                     print("\n Running validation...")
-                    scores, predictions = validate(
-                                                validation_data=self.training.validate_data,
-                                                model = self.training.detection_model,
-                                                input_shape = self.training.input_shape
-                                                )
-                    self.validations.add_validation(iteration=i, scores=scores, predictions=predictions)
+                    scores, predictions, candidates = validate(
+                                                            validation_data=self.training.validate_data,
+                                                            model = self.training.detection_model,
+                                                            input_shape = self.training.input_shape
+                                                            )
+                    self.validations.add_validation(iteration=i, 
+                                                    scores=scores, 
+                                                    predictions=predictions, 
+                                                    candidates=candidates)
 
                     print(scores)
 
@@ -56,16 +60,20 @@ class Run():
                         self.best_score = scores[f"{self.best_score_name}_average"]
                         self.best_prediction = predictions 
                         self.best_iteration = i
+                        self.candidates = candidates
 
                     print("Resuming training...")
             
             print("Running final validation...")
-            scores, predictions = validate(
+            scores, predictions, candidates = validate(
                                         validation_data=self.training.validate_data,
                                         model = self.training.detection_model,
                                         input_shape = self.training.input_shape
                                         )
-            self.validations.add_validation(iteration=i, scores=scores, predictions=predictions)
+            self.validations.add_validation(iteration=i, 
+                                            scores=scores, 
+                                            predictions=predictions,
+                                            candidates=candidates) 
 
             print(scores)
 
@@ -73,12 +81,13 @@ class Run():
                 self.best_score = scores[f"{self.best_score_name}_average"]
                 self.best_prediction = predictions 
                 self.best_iteration = TRAINING_CONFIG.iterations
+                self.candidates = candidates
 
         if self.best_score == 0 or self.best_score == np.nan:
             return self.best_score, 'N/A', 'N/A'
         
         else:
-            return self.best_score, self.best_prediction, self.best_iteration
+            return self.best_score, self.best_prediction, self.best_iteration, self.candidates
 
 if __name__ == "__main__":
 
@@ -115,7 +124,7 @@ if __name__ == "__main__":
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path)
-    best_score, best_prediction, best_iteration = run.run_training(checkpoint_path=model_checkpoint_path)
+    best_score, best_prediction, best_iteration, candidates = run.run_training(checkpoint_path=model_checkpoint_path)
 
     if best_prediction == 'N/A':
         print("No prediction obtained. Model needs more training.")
@@ -123,6 +132,16 @@ if __name__ == "__main__":
     else:
         print(f"Best {TRAINING_CONFIG.best_score_name}: {best_score}")
         print(f"Best iteration: {best_iteration}")
+        pos_labels = 0 
+        neg_labels = 0
+        for candidate in candidates:
+            if candidate.label == 1:
+                pos_labels += 1 
+            if candidate.label == 2:
+                neg_labels +=1 
+        
+        print(f"PC+ predictions: {pos_labels}", f"PC- predictions: {neg_labels}")
+
         # Load predictions
         pos_pred = best_prediction['Positive']
         neg_pred = best_prediction['Negative']
@@ -144,6 +163,11 @@ if __name__ == "__main__":
             f[save_location + '/Positive'].attrs[atr] = f['target'].attrs[atr]
             f[save_location + '/Negative'].attrs[atr] = f['target'].attrs[atr]
             f[save_location + '/Hough_transformed'].attrs[atr] = f['target'].attrs[atr]
+
+        f[save_location + '/Positive'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
+        f[save_location + '/Negative'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
+        f[save_location + '/Hough_transformed'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
+        
 
         if visualise.lower() == 'y':
             imshow_napari_validation(data_path, save_location)

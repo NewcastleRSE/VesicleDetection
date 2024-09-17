@@ -120,15 +120,33 @@ class HoughDetector:
         else: 
             ball = self.balls[diameter]
 
-        # Find the slice for the ball
-        slices = tuple( 
-                    slice(loc - d//2, loc -d//2 +d)
-                    for loc, d in zip(location, diameter)
-                    )
+        
+        # Check for ball going past the boundary and trim ball accordingly. 
+        slices_list = []
+        ball_slices_list = []
+        for loc, d, boundary, ball_shape in zip(location, diameter, array.shape, ball.shape):
+            ball_start = (loc - d//2)
+            ball_end = (loc - d//2 +d) 
+            ball_trim_start = 0 
+            ball_trim_end = ball_shape 
+
+            if (ball_start < 0):
+                ball_trim_start = -1*ball_start
+                ball_start = 0
+            if (ball_end > boundary):
+                ball_trim_end = boundary - ball_end 
+                ball_end = boundary
+            
+            slices_list.append(slice(ball_start, ball_end))
+            ball_slices_list.append(slice(ball_trim_start, ball_trim_end))
+        
+        slices = tuple(slices_list)
+        ball_slices = tuple(ball_slices_list)
 
         # Go to ball location in array and set values to label
         view = array[slices]
-        view[ball] = label
+        sliced_ball = ball[ball_slices]
+        view[sliced_ball] = label
 
     def probe_candidate(self, reject_map, location):
 
@@ -137,21 +155,6 @@ class HoughDetector:
             return False
 
         diameter = 2*self.kernel_shape
-
-        # Check to see if detection would leave the bounds of the image.
-        bounds_check = [
-            loc < d/2
-            for loc, d in zip(location, diameter)
-        ]
-        bounds_check += [
-            loc >= s - d/2
-            for loc, d, s in zip(
-                location,
-                diameter,
-                reject_map.shape)
-        ]
-        if any(bounds_check):
-            return False
 
         self.draw_ball(reject_map, location, diameter)
 

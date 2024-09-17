@@ -20,11 +20,13 @@ class Validations:
         self.iterations = []
         self.scores = []
         self.predictions = []
+        self.candidates = []
 
-    def add_validation(self, iteration, scores, predictions):
+    def add_validation(self, iteration, scores, predictions, candidates):
         self.iterations.append(iteration)
         self.scores.append(scores)
         self.predictions.append(predictions)
+        self.candidates.append(candidates)
 
 def validate(
             validation_data: EMData, 
@@ -57,6 +59,8 @@ def validate(
                    'Negative': neg_pred_data, 
                    'Hough_transformed': hough_pred}
     
-    return scores, predictions
+    candidates = hough_detection.accepted_candidates
+    
+    return scores, predictions, candidates
     
     
