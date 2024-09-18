@@ -9,11 +9,13 @@ class Prediction:
      
     def __init__(self,
                 data: EMData,
-                model: DetectionModel, 
-                input_shape: tuple):
+                model: DetectionModel,
+                input_shape: tuple,
+                checkpoint = None):
         
         self.data = data
         self.detection_model = model
+        self.checkpoint = checkpoint
         self.voxel_size = self.data.voxel_size
         self.input_shape = input_shape
 
@@ -103,6 +105,7 @@ class Prediction:
 
         pipeline += gp.torch.Predict(
                 model=self.detection_model,
+                checkpoint = self.checkpoint, 
                 inputs={'x': raw},
                 outputs={0: prediction}
                 )
