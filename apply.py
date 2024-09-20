@@ -35,6 +35,8 @@ def Apply(zarr_path: str, model_checkpoint: str):
                             input_shape = TRAINING_CONFIG.input_shape, 
                             checkpoint = model_checkpoint)
     
+    predictor.print_border_message()
+    
     ret = predictor.predict_pipeline()
     probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
     pos_pred_data = probs[1,:,:,:].detach().numpy()
@@ -50,7 +52,7 @@ def Apply(zarr_path: str, model_checkpoint: str):
 
     date = datetime.today().strftime('%d_%m_%Y')
 
-    save_path = create_unique_directory_file(data_path + f'/predict/predctions/{date}')
+    save_path = create_unique_directory_file(data_path + f'/predict/Predictions/{date}')
     save_location = os.path.relpath(save_path, data_path + '/predict')
 
     # Save the validation prediction in zarr dictionary. 

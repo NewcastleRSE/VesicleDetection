@@ -50,7 +50,40 @@ class PostProcessingConfigs:
              if not hasattr(PostProcessingConfigs, key):
                 setattr(PostProcessingConfigs, key, value)
 
+class TiffToZarrTrainConfigs:
+    def __init__(self):
+        with open("config/tiff_to_zarr_train_config.yaml", "r") as file_object:
+            config = yaml.full_load(file_object)
+
+        self.attributes = config["attributes"]
+        self.output_zarr_path = config["output_zarr_path"]
+        self.path_to_gt_PC_neg_tiff_train = config['path_to_gt_PC_neg_tiff_train']
+        self.path_to_gt_PC_neg_tiff_validate = config['path_to_gt_PC_neg_tiff_validate']
+        self.path_to_gt_PC_pos_tiff_train = config['path_to_gt_PC_pos_tiff_train']
+        self.path_to_gt_PC_pos_tiff_validate = config['path_to_gt_PC_pos_tiff_validate']
+        self.path_to_raw_tiff_train = config['path_to_raw_tiff_train']
+        self.path_to_raw_tiff_validate = config['path_to_raw_tiff_validate']
+        
+        for key, value in zip(config.keys(), config.values()):
+             if not hasattr(TiffToZarrTrainConfigs, key):
+                setattr(TiffToZarrTrainConfigs, key, value)
+
+class TiffToZarrPredictConfigs:
+    def __init__(self):
+        with open("config/tiff_to_zarr_predict_config.yaml", "r") as file_object:
+            config = yaml.full_load(file_object)
+
+        self.attributes = config["attributes"]
+        self.output_zarr_path = config["output_zarr_path"]
+        self.path_to_raw_tiff = config['path_to_raw_tiff']
+        
+        for key, value in zip(config.keys(), config.values()):
+             if not hasattr(TiffToZarrPredictConfigs, key):
+                setattr(TiffToZarrPredictConfigs, key, value)
+
 
 MODEL_CONFIG = ModelConfigs()
 TRAINING_CONFIG = TrainingConfigs()
 POST_PROCESSING_CONFIG = PostProcessingConfigs()
+TIFF_TO_ZARR_TRAIN_CONFIG = TiffToZarrTrainConfigs()
+TIFF_TO_ZARR_PREDICT_CONFIG = TiffToZarrPredictConfigs()

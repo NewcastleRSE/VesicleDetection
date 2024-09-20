@@ -28,8 +28,8 @@ class DetectionModel(torch.nn.Module):
 
         self.downsample_factors = downsample_factors
 
-        self.kernel_size_down = [[(2,) + (3,)*(dims-1), (2,) + (3,)*(dims-1)]]*levels
-        self.kernel_size_up = [[(2,) + (3,)*(dims-1), (2,) + (3,)*(dims-1)]]*(levels - 1)
+        self.kernel_size_down = [[(3,) + (3,)*(dims-1), (3,) + (3,)*(dims-1)]]*levels
+        self.kernel_size_up = [[(3,) + (3,)*(dims-1), (3,) + (3,)*(dims-1)]]*(levels - 1)
 
         torch.manual_seed(18) 
         
