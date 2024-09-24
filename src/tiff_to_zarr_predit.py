@@ -8,7 +8,12 @@ from config.load_configs import TIFF_TO_ZARR_PREDICT_CONFIG
 
 def convert_to_zarr_predict():
 
-    f = zarr.open(TIFF_TO_ZARR_PREDICT_CONFIG.output_zarr_path, mode='r+')
+    if os.path.exists(TIFF_TO_ZARR_PREDICT_CONFIG.output_zarr_path):
+        mode = 'r+'
+    else: 
+        mode = 'w'
+
+    f = zarr.open(TIFF_TO_ZARR_PREDICT_CONFIG.output_zarr_path, mode=mode)
 
     # Prediction Data 
 

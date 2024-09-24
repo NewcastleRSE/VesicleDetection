@@ -9,7 +9,12 @@ from config.load_configs import TIFF_TO_ZARR_TRAIN_CONFIG
 
 def convert_to_zarr_train():
 
-    f = zarr.open(TIFF_TO_ZARR_TRAIN_CONFIG.output_zarr_path, mode='w')
+    if os.path.exists(TIFF_TO_ZARR_TRAIN_CONFIG.output_zarr_path):
+        mode = 'r+'
+    else: 
+        mode = 'w'
+
+    f = zarr.open(TIFF_TO_ZARR_TRAIN_CONFIG.output_zarr_path, mode=mode)
 
     # Training Data 
 
@@ -88,24 +93,6 @@ def convert_to_zarr_train():
     
     f['validate/gt'].attrs['num_classes'] = 3
     f['validate/gt'].attrs['background_label'] = 0
-
-# def convert_to_zarr_predict():
-
-#     f = zarr.open(TIFF_TO_ZARR_CONFIG.output_zarr_path, mode='w')
-
-#     # Training Data 
-
-#     raw_dir = TIFF_TO_ZARR_CONFIG.path_to_raw_tiff
-
-#     raw_files = sorted(glob.glob(os.path.join(raw_dir, '*.tif')))
-#     raw = np.array([skimage.io.imread(r) for r in raw_files])
-
-#     if (raw.shape[0] == 1):
-#         raw = raw[0,:]
-
-#     f['predict/raw'] = raw[:,:,0:70]
-#     for k,v in TIFF_TO_ZARR_CONFIG.attributes.items():
-#         f['train/raw'].attrs[k] = v
 
     
 if __name__ == "__main__":
