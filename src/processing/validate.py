@@ -16,17 +16,11 @@ from config.load_configs import POST_PROCESSING_CONFIG
 
 class Validations:
 
-    def __init__(self):
-        self.iterations = []
-        self.scores = []
-        self.predictions = []
-        self.candidates = []
-
-    def add_validation(self, iteration, scores, predictions, candidates):
-        self.iterations.append(iteration)
-        self.scores.append(scores)
-        self.predictions.append(predictions)
-        self.candidates.append(candidates)
+    def __init__(self, iteration, scores, predictions, candidates):
+        self.iteration = iteration
+        self.scores = scores
+        self.predictions = predictions
+        self.candidates = candidates
 
 def validate(
             validation_data: EMData, 

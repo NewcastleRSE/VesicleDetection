@@ -2,6 +2,7 @@ import os
 import zarr 
 import gunpowder as gp
 import numpy as np
+import yaml
 
 from tqdm import tqdm
 from datetime import datetime
@@ -12,6 +13,7 @@ from src.directory_organisor import create_unique_directory_file
 from src.processing.post_processing.hough_detector import HoughDetector
 from config.load_configs import TRAINING_CONFIG
 from src.processing.validate import Validations, validate
+from src.save_validations import save_validation_to_JSON
 
 class Run():
 
@@ -24,7 +26,7 @@ class Run():
         self.zarr_path = zarr_path
         self.training = Training(zarr_path = self.zarr_path)
         self.training_stats = TrainingStatistics()
-        self.validations = Validations()
+        self.validations = []
         self.best_score_name = best_score_name
         self.best_score = 0.0
         self.candidate = None
@@ -49,10 +51,13 @@ class Run():
                                                             model = self.training.detection_model,
                                                             input_shape = self.training.input_shape
                                                             )
-                    self.validations.add_validation(iteration=i, 
-                                                    scores=scores, 
-                                                    predictions=predictions, 
-                                                    candidates=candidates)
+                    self.validations.append(
+                                    Validations(
+                                        iteration=i, 
+                                        scores=scores, 
+                                        predictions=predictions,
+                                        candidates=candidates) 
+                                    )
 
                     print(scores)
 
@@ -70,10 +75,13 @@ class Run():
                                         model = self.training.detection_model,
                                         input_shape = self.training.input_shape
                                         )
-            self.validations.add_validation(iteration=i, 
-                                            scores=scores, 
-                                            predictions=predictions,
-                                            candidates=candidates) 
+            self.validations.append(
+                                    Validations(
+                                        iteration=TRAINING_CONFIG.iterations, 
+                                        scores=scores, 
+                                        predictions=predictions,
+                                        candidates=candidates) 
+                                    )
 
             print(scores)
 
@@ -87,7 +95,7 @@ class Run():
             return self.best_score, 'N/A', 'N/A'
         
         else:
-            return self.best_score, self.best_prediction, self.best_iteration, self.candidates
+            return self.best_score, self.best_prediction, self.best_iteration, self.candidates, self.validations
 
 if __name__ == "__main__":
 
@@ -124,14 +132,13 @@ if __name__ == "__main__":
     print(f"Loading data from {data_path}...")
 
     run = Run(data_path)
-    best_score, best_prediction, best_iteration, candidates = run.run_training(checkpoint_path=model_checkpoint_path)
+    best_score, best_prediction, best_iteration, candidates, validations = run.run_training(checkpoint_path=model_checkpoint_path)
 
     if best_prediction == 'N/A':
         print("No prediction obtained. Model needs more training.")
 
     else:
-        print(f"Best {TRAINING_CONFIG.best_score_name}: {best_score}")
-        print(f"Best iteration: {best_iteration}")
+
         pos_labels = 0 
         neg_labels = 0
         for candidate in candidates:
@@ -139,8 +146,18 @@ if __name__ == "__main__":
                 pos_labels += 1 
             if candidate.label == 2:
                 neg_labels +=1 
+
+        summary_dict = {}
+        summary_dict[f"Best {TRAINING_CONFIG.best_score_name}"] = best_score
+        summary_dict["Best iteration"] = best_iteration
+        summary_dict["PC+ predictions"] = pos_labels
+        summary_dict["PC- predictions"] = neg_labels
+        summary_dict["Used pretrained model"] = load_model.lower()
+        if load_model.lower() == 'y':
+            summary_dict["Model checkpoint used"] = model_checkpoint_path
         
-        print(f"PC+ predictions: {pos_labels}", f"PC- predictions: {neg_labels}")
+        with open("config/training_config.yaml", "r") as file_object:
+            train_config = yaml.full_load(file_object)
 
         # Load predictions
         pos_pred = best_prediction['Positive']
@@ -167,6 +184,11 @@ if __name__ == "__main__":
         f[save_location + '/Positive'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
         f[save_location + '/Negative'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
         f[save_location + '/Hough_transformed'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
+
+        save_validation_to_JSON(validations=validations, 
+                                json_path=save_path + "/validation_runs", 
+                                summary_dict=summary_dict, 
+                                train_dict=train_config)
         
 
         if visualise.lower() == 'y':
