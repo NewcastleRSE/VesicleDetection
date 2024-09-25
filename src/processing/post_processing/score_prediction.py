@@ -12,12 +12,14 @@ def score_prediction(pred,
     voxel_size = target.attrs['resolution']
     background_label = target.attrs['background_label']
 
+    # Find the size difference between target and prediction
     if target.shape != pred.shape:
         border = [
                 int((target.shape[0] - pred.shape[0])/2), 
                 int((target.shape[1] - pred.shape[1])/2), 
                 int((target.shape[2] - pred.shape[2])/2)
                 ]
+        # trim target to match prediction
         gt_data = target[
                         border[0]:-1*border[0],
                         border[1]:-1*border[1],
@@ -35,6 +37,7 @@ def score_prediction(pred,
     scores['recall_total'] = 0.0
     scores['fscore_total'] = 0.0
 
+    # Remove background label from scoring
     if background_label is not None:
         label_ids = label_ids[label_ids != background_label]
 

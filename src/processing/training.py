@@ -81,6 +81,7 @@ class Training():
         self.predict_size = self.validate_data.voxel_size * predict_shape
         self.border_size = self.validate_data.voxel_size * border_shape
         
+        # Weight the cross entropy to account for dominant background labels
         self.loss = CustomCrossEntropy(weight = [0.01, 1.0, 1.0])
 
         self.optimizer = torch.optim.Adam(self.detection_model.parameters(), lr = 1e-5)
@@ -153,8 +154,6 @@ class Training():
         if self.training_data.has_mask:
             request.add(mask, self.output_size) 
 
-        #pipeline += gp.Pad(raw, None)
-        #pipeline += gp.Pad(target, (self.input_size-self.output_size)/2 )
         pipeline += gp.Normalize(raw)
         if self.training_data.has_mask:
             pipeline += gp.RandomLocation(min_masked=0.1, mask=mask)

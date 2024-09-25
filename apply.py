@@ -37,11 +37,13 @@ def Apply(zarr_path: str, model_checkpoint: str):
     
     predictor.print_border_message()
     
+    # Get probablities
     ret = predictor.predict_pipeline()
     probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
     pos_pred_data = probs[1,:,:,:].detach().numpy()
     neg_pred_data = probs[2,:,:,:].detach().numpy()
 
+    # Post process with hough detector
     hough_detection = HoughDetector(pred_pos = pos_pred_data,
                                     pred_neg = neg_pred_data,
                                     voxel_size = data.voxel_size)
@@ -52,6 +54,7 @@ def Apply(zarr_path: str, model_checkpoint: str):
 
     date = datetime.today().strftime('%d_%m_%Y')
 
+    # Create save location
     save_path = create_unique_directory_file(data_path + f'/predict/Predictions/{date}')
     save_location = os.path.relpath(save_path, data_path + '/predict')
 

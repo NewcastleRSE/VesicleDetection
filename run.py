@@ -58,9 +58,10 @@ class Run():
                                         predictions=predictions,
                                         candidates=candidates) 
                                     )
-
+                    # Display validation scores to terminal
                     print(scores)
 
+                    # Save best validation statistics
                     if scores[f"{self.best_score_name}_average"] >= self.best_score:
                         self.best_score = scores[f"{self.best_score_name}_average"]
                         self.best_prediction = predictions 
@@ -70,6 +71,8 @@ class Run():
                     print("Resuming training...")
             
             print("Running final validation...")
+
+            # Compute the final validation after training complete
             scores, predictions, candidates = validate(
                                         validation_data=self.training.validate_data,
                                         model = self.training.detection_model,
@@ -82,20 +85,16 @@ class Run():
                                         predictions=predictions,
                                         candidates=candidates) 
                                     )
-
+            
+            # Display validation scores to terminal
             print(scores)
 
+            # Save best validation statistics
             if scores[f"{self.best_score_name}_average"] >= self.best_score:
                 self.best_score = scores[f"{self.best_score_name}_average"]
                 self.best_prediction = predictions 
                 self.best_iteration = TRAINING_CONFIG.iterations
                 self.candidates = candidates
-
-        if self.best_score == 0 or self.best_score == np.nan:
-            return self.best_score, 'N/A', 'N/A'
-        
-        else:
-            return self.best_score, self.best_prediction, self.best_iteration, self.candidates, self.validations
 
 if __name__ == "__main__":
 
@@ -131,14 +130,22 @@ if __name__ == "__main__":
     print("-----")
     print(f"Loading data from {data_path}...")
 
+    # Run training 
     run = Run(data_path)
-    best_score, best_prediction, best_iteration, candidates, validations = run.run_training(checkpoint_path=model_checkpoint_path)
+    run.run_training(checkpoint_path=model_checkpoint_path)
+    best_score = run.best_score
 
-    if best_prediction == 'N/A':
+    # Check to see if the model has learned enough
+    if best_score == 0 or best_score == np.nan:
         print("No prediction obtained. Model needs more training.")
 
     else:
+        best_prediction = run.best_prediction
+        best_iteration = run.best_iteration
+        candidates = run.candidates
+        validations = run.validations
 
+        # Compute number of PC+ and PC- labels
         pos_labels = 0 
         neg_labels = 0
         for candidate in candidates:
@@ -147,6 +154,7 @@ if __name__ == "__main__":
             if candidate.label == 2:
                 neg_labels +=1 
 
+        # Create summary dictionary for summary json file
         summary_dict = {}
         summary_dict[f"Best {TRAINING_CONFIG.best_score_name}"] = best_score
         summary_dict["Best iteration"] = best_iteration
@@ -181,15 +189,17 @@ if __name__ == "__main__":
             f[save_location + '/Negative'].attrs[atr] = f['target'].attrs[atr]
             f[save_location + '/Hough_transformed'].attrs[atr] = f['target'].attrs[atr]
 
+        # Give the best prediction an attribute indicating which score was used
         f[save_location + '/Positive'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
         f[save_location + '/Negative'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
         f[save_location + '/Hough_transformed'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
 
+        # Save all validation runs to json file
         save_validation_to_JSON(validations=validations, 
                                 json_path=save_path + "/validation_runs", 
                                 summary_dict=summary_dict, 
                                 train_dict=train_config)
         
-
+        # Visualise the best prediction in napari
         if visualise.lower() == 'y':
             imshow_napari_validation(data_path, save_location)
