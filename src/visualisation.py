@@ -5,7 +5,7 @@ import zarr
 
 def imshow_napari_validation(data_path, save_location):
     f = zarr.open(data_path + "/validate", mode='r')
-    raw_data = f['raw_clahe'][:,:,:]
+    raw_data = f['raw'][:,:,:]
     target_data = f['target'][:,:,:]
     hough_transformed = f[f'{save_location}/Hough_transformed'][:,:,:]
 
@@ -22,7 +22,7 @@ def imshow_napari_validation(data_path, save_location):
 
 def imshow_napari_prediction(data_path, save_location):
     f = zarr.open(data_path + '/predict', mode='r')
-    raw_data = f['raw_clahe'][:,:,:]
+    raw_data = f['raw'][:,:,:]
     hough_transformed = f[f'{save_location}/Hough_transformed'][:,:,:]
 
     # Obtain difference between input shape and output shape, to allow alignment in napari
