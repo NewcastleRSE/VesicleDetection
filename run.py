@@ -3,6 +3,7 @@ import zarr
 import gunpowder as gp
 import numpy as np
 import yaml
+import pandas as pd
 
 from tqdm import tqdm
 from datetime import datetime
@@ -13,7 +14,8 @@ from src.directory_organisor import create_unique_directory_file
 from src.processing.post_processing.hough_detector import HoughDetector
 from config.load_configs import TRAINING_CONFIG
 from src.processing.validate import Validations, validate
-from src.save_validations import save_validation_to_JSON
+from src.save_validations import save_validation_to_JSON, save_validation_to_dataframe
+from src.model.loss import CustomCrossEntropy
 
 class Run():
 
@@ -41,12 +43,12 @@ class Run():
             for i in tqdm(range(TRAINING_CONFIG.iterations)):
                 batch = pipeline.request_batch(request)
                 train_time = batch.profiling_stats.get_timing_summary('Train', 'process').times[-1]
-                self.training_stats.add_stats(iteration=i, loss=batch.loss, time= train_time)
+                self.training_stats.add_stats(iteration=i, loss=batch.loss, time=train_time)
 
                 # Validate model during training 
                 if (i % TRAINING_CONFIG.val_every == 0) and (i>0):
                     print("\n Running validation...")
-                    scores, predictions, candidates = validate(
+                    scores, predictions, candidates, val_loss = validate(
                                                             validation_data=self.training.validate_data,
                                                             model = self.training.detection_model,
                                                             input_shape = self.training.input_shape
@@ -56,8 +58,10 @@ class Run():
                                         iteration=i, 
                                         scores=scores, 
                                         predictions=predictions,
-                                        candidates=candidates) 
+                                        candidates=candidates,
+                                        loss=val_loss) 
                                     )
+
                     # Display validation scores to terminal
                     print(scores)
 
@@ -72,8 +76,11 @@ class Run():
             
             print("Running final validation...")
 
+            train_time = batch.profiling_stats.get_timing_summary('Train', 'process').times[-1]
+            self.training_stats.add_stats(iteration=TRAINING_CONFIG.iterations, loss=batch.loss, time=train_time)
+
             # Compute the final validation after training complete
-            scores, predictions, candidates = validate(
+            scores, predictions, candidates, val_loss = validate(
                                         validation_data=self.training.validate_data,
                                         model = self.training.detection_model,
                                         input_shape = self.training.input_shape
@@ -83,7 +90,8 @@ class Run():
                                         iteration=TRAINING_CONFIG.iterations, 
                                         scores=scores, 
                                         predictions=predictions,
-                                        candidates=candidates) 
+                                        candidates=candidates, 
+                                        loss=val_loss) 
                                     )
             
             # Display validation scores to terminal
@@ -152,7 +160,7 @@ if __name__ == "__main__":
             if candidate.label == 1:
                 pos_labels += 1 
             if candidate.label == 2:
-                neg_labels +=1 
+                neg_labels +=1
 
         # Create summary dictionary for summary json file
         summary_dict = {}
@@ -194,11 +202,18 @@ if __name__ == "__main__":
         f[save_location + '/Negative'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
         f[save_location + '/Hough_transformed'].attrs['best_score_name'] = TRAINING_CONFIG.best_score_name
 
-        # Save all validation runs to json file
-        save_validation_to_JSON(validations=validations, 
-                                json_path=save_path + "/validation_runs", 
-                                summary_dict=summary_dict, 
-                                train_dict=train_config)
+        # # Save all validation runs to json file
+        # save_validation_to_JSON(validations=validations, 
+        #                         json_path=save_path + "/validation_runs", 
+        #                         summary_dict=summary_dict, 
+        #                         train_dict=train_config)
+
+        save_validation_to_dataframe(validations=validations, training_stats=run.training_stats, csv_path= save_path + "/validation_runs")
+
+        # Get training stats 
+        # training_stats_dict = {"Iteration": run.training_stats.iterations, "Loss": run.training_stats.losses, "Time": run.training_stats.times}
+        # df = pd.DataFrame(training_stats_dict)
+        # print(df)
         
         # Visualise the best prediction in napari
         if visualise.lower() == 'y':
