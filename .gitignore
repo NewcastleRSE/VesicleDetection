@@ -173,3 +173,5 @@ data/
 Notebook/ 
 
 Model_checkpoints/
+
+saved_models/

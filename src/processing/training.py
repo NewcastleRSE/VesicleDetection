@@ -86,6 +86,12 @@ class Training():
 
         self.optimizer = torch.optim.Adam(self.detection_model.parameters(), lr = 1e-5)
 
+        use_cuda = torch.cuda.is_available()
+        self.device = torch.device("cuda" if use_cuda else "cpu")
+
+        self.detection_model = self.detection_model.to(self.device)
+        self.loss = self.loss.to(self.device)
+
         self.date = datetime.today().strftime('%d_%m_%Y')
 
     def training_pipeline(
@@ -93,17 +99,17 @@ class Training():
                 augmentations = TRAINING_CONFIG.augmentations,
                 batch_size = TRAINING_CONFIG.batch_size,
                 snapshot_every = TRAINING_CONFIG.snapshot_every,
-                checkpoint_path = TRAINING_CONFIG.checkpoint_path,
+                #checkpoint_path = TRAINING_CONFIG.checkpoint_path,
                 outdir = None
                 ):
         
-        if checkpoint_path == None:
-            # Create directory for saving model checkpoints
-            self.checkpoint_path = create_unique_directory_file(f'Model_checkpoints/{self.date}')
-            os.makedirs(self.checkpoint_path, exist_ok=True)
+        # if checkpoint_path == None:
+        #     # Create directory for saving model checkpoints
+        #     self.checkpoint_path = create_unique_directory_file(f'Model_checkpoints/{self.date}')
+        #     os.makedirs(self.checkpoint_path, exist_ok=True)
 
-        else: 
-            self.checkpoint_path = checkpoint_path
+        # else: 
+        #     self.checkpoint_path = checkpoint_path
 
         # Set the model to train mode
         self.detection_model.train()
@@ -182,7 +188,7 @@ class Training():
             inputs = {'x': raw},
             loss_inputs = loss_inputs,
             outputs={0: prediction},
-            checkpoint_basename = self.checkpoint_path + '/model',
+            #checkpoint_basename = self.checkpoint_path + '/model',
             save_every= TRAINING_CONFIG.save_every
             )
 

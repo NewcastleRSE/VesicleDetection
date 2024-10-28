@@ -33,9 +33,12 @@ def score_prediction(pred,
     label_ids = np.unique(gt_data).astype(np.int32)
     scores = dict()
 
-    scores['precision_total'] = 0.0
-    scores['recall_total'] = 0.0
-    scores['fscore_total'] = 0.0
+    # scores['precision_total'] = 0.0
+    # scores['recall_total'] = 0.0
+    # scores['fscore_total'] = 0.0
+    precision_total = 0.0 
+    recall_total = 0.0 
+    fscore_total = 0.0
 
     # Remove background label from scoring
     if background_label is not None:
@@ -81,14 +84,17 @@ def score_prediction(pred,
         scores[f'fscore_{label}'] = fscore 
 
         # Update total scores
-        scores['precision_total'] += precision
-        scores['recall_total'] += recall
-        scores['fscore_total'] += fscore
+        # scores['precision_total'] += precision
+        # scores['recall_total'] += recall
+        # scores['fscore_total'] += fscore
+        precision_total += precision
+        recall_total += recall 
+        fscore_total += fscore
 
     if label_ids.size >= 1:
-        scores['precision_average'] = scores['precision_total']/label_ids.size
-        scores['recall_average'] = scores['recall_total']/label_ids.size
-        scores['fscore_average'] = scores['fscore_total']/label_ids.size
+        scores['precision_average'] = precision_total/label_ids.size
+        scores['recall_average'] = recall_total/label_ids.size
+        scores['fscore_average'] = fscore_total/label_ids.size
 
     return scores 
 

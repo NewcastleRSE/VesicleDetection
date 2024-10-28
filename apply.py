@@ -61,15 +61,15 @@ def Apply(zarr_path: str, model_checkpoint: str):
     # Save the validation prediction in zarr dictionary. 
     f = zarr.open(data_path + '/predict', mode='r+')
     f[save_location + '/Hough_transformed'] = hough_pred
-    f[save_location + '/Positive'] = pos_pred_data
-    f[save_location + '/Negative'] = neg_pred_data
+    # f[save_location + '/Positive'] = pos_pred_data
+    # f[save_location + '/Negative'] = neg_pred_data
 
     for atr in data.raw_data.attrs:
         f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
-        f[save_location + '/Positive'].attrs[atr] = data.raw_data.attrs[atr]
-        f[save_location + '/Negative'].attrs[atr] = data.raw_data.attrs[atr]
+        # f[save_location + '/Positive'].attrs[atr] = data.raw_data.attrs[atr]
+        # f[save_location + '/Negative'].attrs[atr] = data.raw_data.attrs[atr]
     
-    return candidates, save_location
+    return candidates, save_path
 
 if __name__ == "__main__":
         

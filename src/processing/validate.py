@@ -68,9 +68,11 @@ def validate(
                             pred = hough_pred,
                             target = validation_data.target_data
                             )
-    predictions = {'Positive': pos_pred_data, 
-                   'Negative': neg_pred_data, 
-                   'Hough_transformed': hough_pred}
+    # predictions = {'Positive': pos_pred_data, 
+    #                'Negative': neg_pred_data, 
+    #                'Hough_transformed': hough_pred}
+
+    predictions = {'Hough_transformed': hough_pred}
     
     candidates = hough_detection.accepted_candidates
     

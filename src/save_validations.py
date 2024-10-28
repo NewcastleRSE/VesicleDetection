@@ -2,6 +2,8 @@ import json
 import numpy as np
 import os
 import pandas as pd
+import csv
+import zarr
 
 from src.processing.validate import Validations
 from src.processing.training import TrainingStatistics
@@ -145,3 +147,101 @@ def save_validation_to_dataframe(validations: list[Validations], training_stats:
     df_losses.to_csv(csv_path + "/losses.csv", index=True)
 
     # return df_scores, df_candidates
+
+def save_best_validations(best_validations: dict, save_location):
+    # Create iteration directory
+    if not os.path.exists(save_location):
+        os.makedirs(save_location)
+
+    for k,v in best_validations.items():
+
+        csv_save_location = f"{save_location}/{k}"
+        if not os.path.exists(csv_save_location):
+            os.makedirs(csv_save_location)
+
+        stats_dict = {"iteration": v.iteration, "scores": v.scores, "loss": v.loss}
+        df_stats = pd.DataFrame(stats_dict)
+
+        # Save PC+/PC- logit prediction and Hough_transformed numpy arrays for each validation run
+        predictions_dict = {}
+        predictions_dict['Positive'] = v.predictions['Positive']
+        predictions_dict['Negative'] = v.predictions['Negative']
+        predictions_dict['Hough_transformed'] = v.predictions['Hough_transformed']
+
+
+        # Save candidate locations, maxima scores and labels for each validation run
+        locations = []
+        maxima_scores = []
+        labels = []
+
+        for candidate in v.candidates:
+            locations.append(candidate.location)
+            maxima_scores.append(candidate.score)
+            labels.append(candidate.label)
+
+        candidate_dict = {}
+        candidate_dict['location'] = locations
+        candidate_dict['score'] = maxima_scores
+        candidate_dict['label'] = labels
+
+        df_candidates = pd.DataFrame(candidate_dict)
+
+        # with open(os.path.join(save_location, f'{k}.json'), mode='w') as f:
+        #     json.dump(d, f, cls=NumpyEncoder)
+
+        df_stats.to_csv(csv_save_location + "/stats.csv", index=True)
+        df_candidates.to_csv(csv_save_location + "/candidates.csv", index=True)
+
+        with open(os.path.join(csv_save_location, 'predictions.json'), mode='w') as f:
+            json.dump(predictions_dict, f, cls=NumpyEncoder)
+
+def save_validations(best_validations: dict, best_scores: dict, save_path: str, data_path: str):
+
+    # Create save location directory
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
+
+    # Load the validation data to get attributes later
+    f_data = zarr.open(data_path + "/validate", mode='r')
+
+    for score_name, validation in best_validations.items():
+
+        csv_save_location = f"{save_path}/{score_name}"
+        if not os.path.exists(csv_save_location):
+            os.makedirs(csv_save_location)
+
+        stats_dict = {"iteration": validation.iteration, "scores": validation.scores, "loss": validation.loss}
+        df_stats = pd.DataFrame(stats_dict)
+
+        # Save candidate locations, maxima scores and labels for each validation run
+        locations = []
+        maxima_scores = []
+        labels = []
+
+        for candidate in validation.candidates:
+            locations.append(candidate.location)
+            maxima_scores.append(candidate.score)
+            labels.append(candidate.label)
+
+        candidate_dict = {}
+        candidate_dict['location'] = locations
+        candidate_dict['score'] = maxima_scores
+        candidate_dict['label'] = labels
+
+        df_candidates = pd.DataFrame(candidate_dict)
+
+        df_stats.to_csv(csv_save_location + "/stats.csv", index=True)
+        df_candidates.to_csv(csv_save_location + "/candidates.csv", index=True)
+
+        best_prediction = validation.predictions
+        best_iteration = validation.iteration
+        candidates = validation.candidates
+        best_score = best_scores[score_name]
+
+        hough_pred = best_prediction['Hough_transformed']
+        save_location = f"{save_path}/{score_name}"
+        f_save = zarr.open(save_location + "/prediction", mode='w')
+        f_save['Hough_transformed'] = hough_pred
+
+        for atr in f_data['target'].attrs:
+            f_save['Hough_transformed'].attrs[atr] = f_data['target'].attrs[atr]
