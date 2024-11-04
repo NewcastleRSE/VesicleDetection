@@ -3,8 +3,9 @@ import glob
 import numpy as np
 import skimage 
 import scipy.ndimage
-import os
+import os 
 from magicgui import magicgui
+import pathlib
 
 class GroundTruth():
      
@@ -16,7 +17,8 @@ class GroundTruth():
                  offset = (0,0,0), 
                  background_label = 0, 
                  num_classes = 3, 
-                 axes =['z','y','x'] ):
+                 axes =['z','y','x'], 
+                 min_distance = 1):
 
         self.pos_data = pos_data
         self.neg_data = neg_data
@@ -26,6 +28,7 @@ class GroundTruth():
         self.num_classes = num_classes
         self.axes = axes 
         self.balls = {}
+        self.min_distance = min_distance
 
         diameter = np.array([vesicle_diameter, vesicle_diameter, vesicle_diameter])
         self.kernel_shape = np.ceil(diameter/self.voxel_size)
@@ -41,7 +44,7 @@ class GroundTruth():
         # Find the indices for the peak local maxima
         centre_indices = skimage.feature.peak_local_max(
                                                     data_convolved, 
-                                                    min_distance = 1, 
+                                                    min_distance = self.min_distance, 
                                                     labels= skimage.measure.label(data)
                                                     )
 
@@ -111,11 +114,8 @@ class GroundTruth():
 
 if __name__ == '__main__':
 
-
-    raw_data_path = 'data/TIF_data/19-13/training02'
-
-    raw_files = sorted(glob.glob(os.path.join(raw_data_path, '*.tif')))
-    raw_data = np.array([skimage.io.imread(r) for r in raw_files])
+    raw_data_path = 'data/TIF_data/17_1A/raw_clahe.tif'
+    raw_data = np.array([skimage.io.imread(raw_data_path)])
 
     # Check for stacks of images
     if (raw_data.shape[0] == 1):
@@ -132,16 +132,62 @@ if __name__ == '__main__':
             vesicle_diameter = 300,
             resolution_z=60,
             resolution_y=60,
-            resolution_x=60) -> napari.types.LayerDataTuple:
+            resolution_x=60, 
+            min_distance: int = 1) -> napari.types.LayerDataTuple:
         ground_truth = GroundTruth(
                                 pos_data = pos.data, 
-                                neg_data=neg.data, 
-                                vesicle_diameter= vesicle_diameter,
-                                resolution=(resolution_z,resolution_y,resolution_x))
+                                neg_data = neg.data, 
+                                vesicle_diameter = vesicle_diameter,
+                                resolution = (resolution_z,resolution_y,resolution_x),
+                                min_distance=min_distance)
         gt = ground_truth.compute_gt()
         return (gt, {'name': 'gt'}, 'labels')
+    
+    @magicgui(call_button='Load')
+    def load_labels(pos_data_path = pathlib.Path('path/to/pos.tif'), 
+                    neg_data_path = pathlib.Path('path/to/neg.tif')):
+        
+        try:
+            pos_data = skimage.io.imread(pos_data_path)
+            pos.data = pos_data 
+        except:
+            if str(pos_data_path) == 'path/to/pos.tif' or str(pos_data_path) == '':
+                pass
+            else:
+                raise FileExistsError('Pos data location provided not suitable. Please try again.')
+        try:
+            neg_data = skimage.io.imread(neg_data_path)
+            neg.data = neg_data 
+        except:
+            if str(neg_data_path) == 'path/to/neg.tif' or str(neg_data_path) == '':
+                pass
+            else:
+                raise FileExistsError('Neg data location provided not suitable. Please try again.')
+    
+    @magicgui(call_button='Save centres')
+    def save_centres(save_location = pathlib.Path('save/location')):
+        if not os.path.exists(save_location):
+            os.makedirs(save_location)
 
+        pos_data = pos.data
+        neg_data = neg.data.astype(np.uint16)
+
+        skimage.io.imsave(f'{save_location}/pos.tif', pos_data)
+        skimage.io.imsave(f'{save_location}/neg.tif', neg_data)
+            
+    @magicgui(call_button='Clear centres')
+    def clear_centres(Pos: bool = False, 
+                      Neg: bool = False):
+        if Pos == True:
+            pos.data = np.zeros(raw_data.shape, dtype=np.int64)
+        if Neg == True:
+            neg.data = np.zeros(raw_data.shape, dtype=np.int64)
+    
+            
     viewer.window.add_dock_widget(get_gt)
+    viewer.window.add_dock_widget(load_labels)
+    viewer.window.add_dock_widget(save_centres)
+    viewer.window.add_dock_widget(clear_centres)
 
 
     napari.run()
