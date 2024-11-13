@@ -7,6 +7,32 @@ def score_prediction(pred,
                     matching_score = 'overlap', 
                     mathching_threshold = 1, 
                     return_results=False):
+    """
+        Obtain a set of scores for a vesicle detection prediction result. The scores used 
+        are: recall, precision and fscore for each possible label type, along with the 
+        average across all labels. 
+
+        Parameters
+        -------------------
+        pred (array):
+            The prediction to be scored. 
+        target (array):
+            The ground truth to be marked against. 
+        matching_score (str):
+            The method to use to score matching of prediction and ground truth. 
+            Fed into funlib.evaluate.detection_score. Options are 'overlap', 'iou'
+            and 'distance'. Default is overlap.
+        matching_threshold (float):
+            The threshold between prediction and target that must be met to be considered
+            a match. Fed into funlib.evaluate.detection_score. Default is 1.
+        return_results (bool):
+            Fed into funlib.evaluate.detection_score as 'return_matches'. Default false.
+
+        Returns
+        -------------------
+        scores (dict):
+            A dictionary containing the scores of the prediction. 
+    """
     
     
     voxel_size = target.attrs['resolution']
@@ -33,9 +59,6 @@ def score_prediction(pred,
     label_ids = np.unique(gt_data).astype(np.int32)
     scores = dict()
 
-    # scores['precision_total'] = 0.0
-    # scores['recall_total'] = 0.0
-    # scores['fscore_total'] = 0.0
     precision_total = 0.0 
     recall_total = 0.0 
     fscore_total = 0.0
@@ -84,9 +107,6 @@ def score_prediction(pred,
         scores[f'fscore_{label}'] = fscore 
 
         # Update total scores
-        # scores['precision_total'] += precision
-        # scores['recall_total'] += recall
-        # scores['fscore_total'] += fscore
         precision_total += precision
         recall_total += recall 
         fscore_total += fscore

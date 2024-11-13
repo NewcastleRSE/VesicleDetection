@@ -2,7 +2,7 @@ augmentations:
 - gp.SimpleAugment(transpose_only=(1,2))
 - gp.ElasticAugment((1,10,10), (0,0.1,0.1), (0,math.pi/2))
 batch_size: 1
-best_score_name: fscore
+best_score_name: fscore_average
 checkpoint_path: null
 clahe: true
 has_mask: false

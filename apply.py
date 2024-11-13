@@ -14,6 +14,17 @@ from src.visualisation import imshow_napari_prediction
 from config.load_configs import TRAINING_CONFIG
 
 def Apply(zarr_path: str, model_checkpoint: str):
+    """
+        Use a pretrained vesicle detection model to predict vesicles in unlablled data. 
+
+        Parameters 
+        -------------------
+        zarr_path (str):
+            Path to the zarr group that contains the 'predict' zarr group within it. This 
+            path will be fed into the EMData class. 
+        model_checkpoint (str):
+            Path to the model that should be used for prediction. 
+    """
 
     data = EMData(zarr_path, 'predict', clahe=TRAINING_CONFIG.clahe)
     candidates = None
@@ -25,16 +36,19 @@ def Apply(zarr_path: str, model_checkpoint: str):
     elif len(data.raw_data.shape) == 4:
         raw_channels = data.raw_data.shape[0]
 
+    # Get an instance of the model
     detection_model = DetectionModel(
                 raw_num_channels=raw_channels,
                 voxel_size = data.voxel_size
                 )
 
+    # Initiate a prediction
     predictor = Prediction(data = data,
                             model = detection_model,
                             input_shape = TRAINING_CONFIG.input_shape, 
                             checkpoint = model_checkpoint)
     
+    # Display the border of the output predicition compared to input shape 
     predictor.print_border_message()
     
     # Get probablities
@@ -61,13 +75,9 @@ def Apply(zarr_path: str, model_checkpoint: str):
     # Save the validation prediction in zarr dictionary. 
     f = zarr.open(data_path + '/predict', mode='r+')
     f[save_location + '/Hough_transformed'] = hough_pred
-    # f[save_location + '/Positive'] = pos_pred_data
-    # f[save_location + '/Negative'] = neg_pred_data
 
     for atr in data.raw_data.attrs:
         f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
-        # f[save_location + '/Positive'].attrs[atr] = data.raw_data.attrs[atr]
-        # f[save_location + '/Negative'].attrs[atr] = data.raw_data.attrs[atr]
     
     return candidates, save_path
 

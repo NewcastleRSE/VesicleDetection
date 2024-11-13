@@ -4,6 +4,10 @@ from src.model.model import UnetOutputShape
 from config.load_configs import TRAINING_CONFIG
 
 def check_output_shape():
+    """
+        Check the output shape of the data after being passed through the UNet model.
+        Will print the result into terminal window. 
+    """
 
     model = DetectionModel(raw_num_channels=1, 
                            voxel_size=(1,1,1)

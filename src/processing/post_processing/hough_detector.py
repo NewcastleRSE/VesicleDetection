@@ -3,12 +3,23 @@ import scipy.ndimage
 import skimage.feature 
 import skimage.morphology
 import zarr
-import gunpowder as gp
 
 from config.load_configs import POST_PROCESSING_CONFIG
 
 class HoughCandidate:
         def __init__(self, location, maxima, label):
+            """
+                Vesicle candidates after post processing.
+
+                Attributes 
+                -------------------
+                location:
+                    The location of the centre of the vesicle candidate.
+                score: 
+                    The confidence score for this candidate to be a vesicle.
+                label: 
+                    The label of the vesicle.
+            """
             self.location = location
             self.score = maxima 
             self.label = label
@@ -16,9 +27,37 @@ class HoughCandidate:
 class HoughDetector:
 
     def __init__(self, pred_pos, pred_neg, voxel_size, combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg):
+        """
+            Post processing class for output of vesicle detection model. 
 
-        # self.pred_pos = pred_pos
-        # self.pred_neg = pred_neg
+            Attributes 
+            -------------------
+            pred_pos_data:
+                The array containing the predicted probability distribution for PC+ vesicles in the image.
+            pred_neg_data:
+                The array containing the predicted probability distribution for PC- vesicles in the image.
+            combine_pos_neg:
+                Whether to combine the probabilities for PC+ and PC- detection. If set to true, this will 
+                result in a post processing procedure that favours finding vesicle existance and later labelling, 
+                rather than looking for PC+ and PC- vesicles independently. 
+            voxel_size:
+                The voxel size of the image.
+            balls:
+                A dictionary who's key is the diameter of a ball and who's value is corresponding skimage ball.
+            roi:
+                The region of interest, i.e. the shape of the prediction. 
+            kernel_shape:
+                The shape of the balls translated into voxel sizes.
+            candidates:
+                All vesicle candidates. 
+            accepted_candidates:
+                Vesicle candidates that are accepted after elimination process (e.g. thresholding and asserting
+                non-overlap of vesicles).
+            prediction_result:
+                The array containing the vesicle prediction after post processing.
+            
+        """
+
         self.pred_pos_data = pred_pos
         self.pred_neg_data = pred_neg
         self.combine_pos_neg = combine_pos_neg
@@ -26,6 +65,14 @@ class HoughDetector:
         self.balls = {}
 
     def hough_prediction(self, threshold):
+        """
+            Obtain the candidate vesicles after thresholding. 
+
+            Parameters
+            -------------------
+            threshold (float):
+                The threshold the peak_local_max must exceed to be considered a candidate.
+        """
 
         self.roi = self.pred_pos_data.shape
 
@@ -90,6 +137,28 @@ class HoughDetector:
             self.candidates = sorted(candidates.items(), key = lambda x: x[1], reverse=True)
 
     def hough_transformation(self, prediction, kernel, threshold):
+        """
+            Hough transformation of the predicition: prediction is convolved with the kernel
+            and then peak_local_max coordinates and values obtained. 
+
+            Parameters
+            -------------------
+            prediction (array):
+                The prediction that is to be hough transformed. 
+            kernel (array):
+                The kernel to convolve the data with. For spherical vesicle searches, kernel
+                should be a sphere with diameter given by expected vesicle size. 
+            threshold (float):
+                The minimum intensity a peak must have in the convolved image to be considered 
+                a suitable vesicle candidate.
+
+            Returns 
+            -------------------
+            maxima (list):
+                The peak values at the vesicle candidate centres in the convolved image. 
+            maxima_indices (list):
+                The indices of the maxima peaks. 
+        """
 
         # Convolve the prediction with a spherical kernel
         prediction_convolved = scipy.ndimage.convolve(prediction, kernel)
@@ -105,6 +174,18 @@ class HoughDetector:
         return maxima, maxima_indices
     
     def draw_ball(self, array, location, diameter, label=1):
+        """
+            Method for drawing a ball inside an array of set diameter and label. 
+
+            Parameters
+            -------------------
+            array:
+                The array in which to draw the ball. 
+            location: 
+                The indices for the centre of the ball. 
+            label:
+                The value of the ball within the array. 
+        """
         
         diameter = tuple(int(x) for x in diameter)
         # Check to see if we already have a ball of this size
@@ -149,6 +230,17 @@ class HoughDetector:
         view[sliced_ball] = label
 
     def probe_candidate(self, reject_map, location):
+        """
+            Check whether a vesicle candidate should be rejected.
+
+            Parameters 
+            -------------------
+            reject_map:
+                This array will store the locations of already accepted vesicles. 
+                Allows to check for non-overlapping of vesicles. 
+            location:
+                The index location for the centre of the candidate vesicle. 
+        """
 
         # Check for existence of other predictions at this location
         if reject_map[location].item():
@@ -161,6 +253,15 @@ class HoughDetector:
         return True
     
     def prediction(self, accepted_candidates):
+        """
+            Draws balls at the locations of accepted vesicle candidates. 
+
+            Parameters
+            -------------------
+            accepted_candidates (list(HoughCandidates)):
+                List of accepted vesicle candidates. Each candidate should be an instance 
+                of the HoughCandidate class, to allow for extracting location and label.
+        """
 
         # Start with all background
         self.prediction_result = np.zeros(self.pred_pos_data.shape, dtype=np.int64)
@@ -175,6 +276,16 @@ class HoughDetector:
                             )
     
     def process(self, maxima_threshold = POST_PROCESSING_CONFIG.maxima_threshold):
+
+        """
+            Run the post processing process. 
+
+            Parameters
+            -------------------
+            maxima_threshold (float):
+                The threshold used to determine vesicle candidates. Default is 
+                set using the post_processing_config.yaml file.
+        """
 
         # Define reject map. This will be updated with "True" values 
         # In locations where vesicles have been detected.

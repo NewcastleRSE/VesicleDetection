@@ -1,11 +1,6 @@
 import torch
 import numpy as np
-import os 
-import zarr
 
-from datetime import datetime
-
-from src.directory_organisor import create_unique_directory_file
 from src.processing.predict import Prediction
 from src.data_loader import EMData
 from src.model.model import DetectionModel
@@ -13,12 +8,27 @@ from src.processing.post_processing.hough_detector import HoughDetector
 from src.processing.post_processing.score_prediction import score_prediction
 from src.model.loss import CustomCrossEntropy
 
-from config.load_configs import POST_PROCESSING_CONFIG
-
 
 class Validations:
 
     def __init__(self, iteration, scores, predictions, candidates, loss):
+        """
+            Class for storing validation results.
+
+            Attributes
+            -------------------
+            iteration:
+                The training iteration used for the validation prediction. 
+            scores:
+                A dictionary containing the scores (recall, precision, fscore)
+                for the validation prediction. 
+            predictions:
+                The prediction data (i.e. the hough transformed prediction). 
+            candidates:
+                The accepted candidates in the hough transformed prediction.
+            loss:
+                The loss of the validation run. 
+        """
         self.iteration = iteration
         self.scores = scores
         self.predictions = predictions
@@ -30,6 +40,34 @@ def validate(
             model: DetectionModel,
             input_shape
             ):
+    """
+        Process for running a validation run. 
+
+        Parameters
+        -------------------
+        validation_data (EMData):
+            A instance of the EMData class which contains the validation data.
+        model:
+            A instance of the DetectionModel class, which contains the model being 
+            trained and validated.
+        input_shape:
+            The input shape to be used with the model. Should match the input shape
+            of the training run. 
+
+        Returns 
+        -------------------
+        scores (dict):
+            A dictionary containing the scores (recall, precision, fscore) of the 
+            prediction -- result of the score_prediction function. 
+        predictions (dict):
+            A dictionary with key "Hough_transformed" who's value is the post processed 
+            prediction data.
+        candidates (list):
+            A list containing the accepted candidates of the post processed predicition. 
+            Entries are instances of the HoughCandidate class. 
+        val_loss (float):
+            The cross entropy loss of the validation run. 
+    """
 
     predictor = Prediction(
                         data = validation_data, 
@@ -68,9 +106,6 @@ def validate(
                             pred = hough_pred,
                             target = validation_data.target_data
                             )
-    # predictions = {'Positive': pos_pred_data, 
-    #                'Negative': neg_pred_data, 
-    #                'Hough_transformed': hough_pred}
 
     predictions = {'Hough_transformed': hough_pred}
     

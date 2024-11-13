@@ -1,9 +1,30 @@
-import matplotlib.pyplot as plt
-import numpy as np
 import napari
 import zarr
 
 def imshow_napari_validation(data_path, prediction_path):
+    """
+        Function to display a validation result in napari. The vesicle prediction
+        will be overlayed on the raw validation image, along with the hand labelled 
+        ground truth. 
+
+        As the UNet crops the output image compared to the input image, the prediction
+        will be smaller than the raw validation image and hand labelled ground truth. 
+        The prediction will be shown in context of the whole image, and so the user should
+        expect a border that contains no prediction. 
+
+        Parameters 
+        -------------------
+        data_path (str):
+            Path to the zarr group containing the data. This should be a zarr group a 'validate'
+            zarr group inside it. The validate group should contain two zarr arrays: 'raw' and 
+            'target'. 
+        prediction_path (str):
+            Path to the zarr group containing the prediction. The zarr group should contain a 
+            zarr array called 'Hough_transformed' inside it, corresponding to the post-processed 
+            prediction on the validation data. 
+    """
+
+    # Load the data
     f_data = zarr.open(data_path + "/validate", mode='r')
     raw_data = f_data['raw'][:,:,:]
     target_data = f_data['target'][:,:,:]
@@ -22,6 +43,25 @@ def imshow_napari_validation(data_path, prediction_path):
     napari.run()
 
 def imshow_napari_prediction(data_path, prediction_path):
+    """
+        Function to display a vesicle prediction result overlayed on the raw data. 
+
+        As the UNet crops the output image compared to the input image, the prediction
+        will be smaller than the raw input image. The prediction will be shown in 
+        context of the whole image, and so the user should expect a border that contains
+        no prediction.
+
+        Parameters
+        -------------------
+        data_path (str):
+            Path to the zarr group containing the 'predict' zarr group. The predict zarr group
+            should itself contain the 'raw' zarr array, corresponding to the raw data. 
+        prediction_path (str):
+            Path to the zarr group containing the predicition. This zarr group should contain 
+            a zarr array called 'Hough_transformed' inside it, corresponding to the post-processed 
+            prediction. 
+    """
+
     f = zarr.open(data_path + '/predict', mode='r')
     raw_data = f['raw'][:,:,:]
     f_prediction = zarr.open(prediction_path, mode='r')

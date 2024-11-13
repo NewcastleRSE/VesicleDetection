@@ -7,15 +7,71 @@ from torch.utils.data import Dataset
 
 
 class EMData(Dataset):
-    """
-        Dataset subclass that loads in the EM data and defines required characteristics. 
-    """
+
     def __init__(self,
                  zarr_path: str,
                  train_validate_predict: str,
                  has_mask = False,
                  clahe = False
                  ):
+        
+        """
+            Dataset subclass that loads in the EM data and defines required characteristics.
+            Will perform consistency checks, e.g. if train or validate data, will ensure that 
+            attributes for raw and gt match. 
+
+            Attributes 
+            -------------------
+            has_mask (bool):
+                Whether to expect mask data. Default is False.
+            mode (str):
+                The type of data. Options: 'train', 'validate' or 'predict'.
+            zarr_path (str):
+                Path to the zarr container. 
+            data (zarr group):
+                The zarr group containing the data.
+            raw_data_path (str):
+                Path to the raw zarr data within the zarr folder.
+            raw_data (zarr array):
+                The raw zarr data.
+            gt_data_path (str): 
+                Path to the ground truth data within the zarr folder. Only
+                relevant for mode = 'train' or mode = 'validate'.
+            gt_data (zarr array):
+                The ground truth zarr data. Only relevant for mode = 'train'
+                or mode = 'validate'.
+            has_target (bool):
+                Wether there already exists a 'target' zarr array. 
+            target_data_path (str): 
+                Path to the target data within the zarr folder. Only
+                relevant for mode = 'train' or mode = 'validate'.
+            target_data (zarr array):
+                The target zarr data. Only relevant for mode = 'train'
+                or mode = 'validate'.
+            mask_data_path (str): 
+                Path to the mask data within the zarr folder. Only
+                relevant for has_mask = True.
+            mask_data (zarr array):
+                The mask zarr data. Only relevant for has_mask = True. 
+            resolution (tuple):
+                The resolution of the zarr data.
+            axes (tuple):
+                The axes orientation of the zarr data.
+            voxel_size (gunpowder.coordinate):
+                A gunpowder coordiante of the resolution. 
+
+            Parameters
+            -------------------
+            zarr_path (str): 
+                The path to the zarr group containing the data. 
+            train_validate_predict (str): 
+                The type of data. Options: 'train', 'validate', 'predict'. 
+            has_mask (bool):
+                Whether to expect the zarr group to contain mask data. Default: False.
+            clahe (bool):
+                Whether to use clahe raw data. If set to True but no clahe zarr array found, will 
+                ask whether to create the clahe array on the fly. Default: False.
+        """
         
         self.has_mask = has_mask
         
@@ -129,7 +185,7 @@ class EMData(Dataset):
 
     def __getitem__(self, index):
         """ 
-            Returns a dictionary containing the raw and ground truth data at index 
+            Returns a dictionary containing the raw and ground truth data at index.
         """
 
         if self.mode == "predict":
@@ -148,6 +204,11 @@ class EMData(Dataset):
         """ 
             Create new zarr array, 'target', that is a copy of 'gt' but with different dtype. 
             If 'target' already exists, it will be overwritten. 
+
+            Parameters
+            -------------------
+            data_type (str):
+                The data type that target should take. Default: int64. 
         """
 
         # Open the zarr file in read and write mode

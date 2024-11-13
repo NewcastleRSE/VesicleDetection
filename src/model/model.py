@@ -16,9 +16,39 @@ class DetectionModel(torch.nn.Module):
                 constant_upsample = MODEL_CONFIG.constant_upsample
                 ):
         
-        # Change for an-isotropic data 
+        """
+            Machine learning model for vesicle detection pipeline. Consists of a 
+            UNet followed by a ConvPass with 3 outputs. Per voxel it returns a 3D 
+            array who's entries are the probabilities that voxel is background, PC+
+            or PC-, respectively. 
 
-        # Look into Segment anything 2 
+            Parameters
+            -------------------
+            raw_num_channels (int):
+                The number of channels in the input raw data. 
+            voxel_size (tuple(int)):
+                The size of a voxel in the input data, in physical units.
+            fmaps (int):
+                The number of feature maps in the first layer of the UNet. 
+                Default set using model_config.yaml file.
+            fmap_inc_factor (int):
+                The multiplicative factor for feature maps between layers.
+                If layer n has k feature maps, layer (n+1) will have 
+                (k * fmap_inc_factor) feature maps. Default set using 
+                model_config.yaml file.
+            downsample_factors (list(tuple)):
+                A list of two tuples. The first sets the downsampling factor 
+                in (z,y,x) between layers of the UNet. The second sets the 
+                upsampling factor in (z,y,x). Default set using model_config.yaml 
+                file.
+            padding (str):
+                How to pad convolutions within the UNet. Options: 'same' or 'valid'. 
+                Default set using model_config.yaml file.
+            constant_upsample (bool):
+                Controls upsampling layers in the UNet. If true, will perform a constant 
+                upsampling instead of a transposed convolution. Default set using 
+                model_config.yaml file.
+        """
         
         super(DetectionModel,self).__init__()
 
@@ -33,6 +63,7 @@ class DetectionModel(torch.nn.Module):
 
         torch.manual_seed(18) 
         
+        # Define the UNet part of the model
         self.unet = UNet(in_channels = 1,
             num_fmaps = fmaps,
             fmap_inc_factor = fmap_inc_factor,
@@ -44,8 +75,10 @@ class DetectionModel(torch.nn.Module):
             voxel_size = voxel_size
         )
 
+        # Define the convolution head of the model
         self.head = ConvPass(fmaps, 3, [(1, 1, 1)], activation=None)
 
+        # Define the complete model 
         self.total_model = torch.nn.Sequential(
                     self.unet,
                     self.head
@@ -61,12 +94,39 @@ def UnetOutputShape(
                     padding = 0,
                     stride = 1
                     ):
-    
+    """
+        Obtain the output shape of an image passed through the vesicle detection 
+        model -- the UNet performs downsampling and upsampling, so the resulting output
+        image can be smaller than the input image. The UNet is assumed to contain 2 
+        downsampling layers and two upsampling layers, with convolution layers between 
+        every other layer for a total of 9 layers (C = conv, D = down, U = up):
+        C -> D -> C -> D -> C -> U -> C -> U -> C
+
+        Parameters 
+        -------------------
+        model (DetectionModel Class):
+            The model to pass the image through. 
+        input_shape (tuple):
+            The shape (in voxels) of the input image. 
+        padding (int):
+            The padding used in convolutions of the UNet. 
+        string (int):
+            The stride used in the convolutions of the UNet.
+
+        Returns
+        -------------------
+        conv_5_out: 
+            The shape of the output shape after the last convolution layer. 
+        border: 
+            The size of border of the output shape compared to the input shape.
+    """
+
+    # Get model specific factors
     kernel_size_down = tuple(model.kernel_size_down[0][0])
     kernel_size_up = tuple(model.kernel_size_up[0][0])
     downsample_factors = model.downsample_factors[0]
     upsample_factors = model.downsample_factors[1]
-    
+
     conv_out_1 = ConvOutputShape(input_shape=input_shape,
                                  kernel_size=kernel_size_down,
                                  padding=padding, 
@@ -109,14 +169,8 @@ def UnetOutputShape(
                                  stride=stride
                                  )
     
+    # Compute the border of the output shape compared to the input shape.
     border = tuple(((np.array(input_shape) - np.array(conv_out_5))/2).astype(int))
-
-
-    # print("-----"*5)
-    # print(f"The model will divide the image into samples of shape (in voxels) {input_shape} " \
-    #         f"and return a corresponding prediction with shape {conv_out_5}.")
-    # print(f"The full prediction of the validation image will have a border of shape {border}.")
-    # print("-----"*5)
     
     return conv_out_5, border
 
@@ -125,6 +179,9 @@ def ConvOutputShape(input_shape,
                     padding=0, 
                     stride=1
                     ):
+    """
+        Computes the shape of an image after a convolution layer.
+    """
     
     in_shape = np.array(input_shape)
 
@@ -138,6 +195,10 @@ def ConvOutputShape(input_shape,
 
 def DownSampleOutShape(input_shape,
                        downsample_factors):
+    """
+        Computes the shape of an image after a downsampling layer.
+    """
+
     in_shape = np.array(input_shape)
 
     if np.any(in_shape %2 != 0):
@@ -149,6 +210,9 @@ def DownSampleOutShape(input_shape,
 
 def UpSampleOutShape(input_shape,
                     upsample_factors):
+    """
+        Computes the shape of an image after a upsampling layer.
+    """
     
     in_shape = np.array(input_shape)
     

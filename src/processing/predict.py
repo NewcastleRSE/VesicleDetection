@@ -12,6 +12,38 @@ class Prediction:
                 model: DetectionModel,
                 input_shape: tuple,
                 checkpoint = None):
+        """
+            Class for vesicle predicition. 
+
+            Attributes 
+            -------------------
+            data:
+                The EMData to predict on. 
+            detection_model: 
+                The model used for prediction. 
+            checkpoint:
+                The checkpoint of a trained model (optional). 
+            voxel_size: 
+                The voxel size of the data. 
+            input_shape:
+                The input shape for the model. 
+            input_size:
+                The size (in physical units) of the input image.
+            raw_channels:
+                The number of channels in the raw data. 
+            output_shape:
+                The shape of the image that comes out the UNet.
+            output_size:
+                The size (in physical units) of the output image.
+            border:
+                The border shape between the output image and input image. 
+            border_size:
+                The border size (in physical units) between the output image and input image.
+            predict_shape:
+                The shape of the prediction image. 
+            predict_size:
+                The size (in physical units) of the prediction image.
+        """
         
         self.data = data
         self.detection_model = model
@@ -66,6 +98,18 @@ class Prediction:
         self.border_size = self.data.voxel_size * border_shape
 
     def predict_pipeline(self):
+
+        """
+            Predicition pipeline for vesicle detection. Input image is 
+            broken down using gunpowder and predictions are done in tiles, 
+            corresponding to the model's trained input size. These individual 
+            prediction tiles are then sewn together to give a full predicition.
+
+            Returns 
+            -------------------
+            ret (dict):
+                A dictionary containing two gunpowder arrays, 'raw' and 'prediction'. 
+        """
     
         self.detection_model.eval()
 

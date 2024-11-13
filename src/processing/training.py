@@ -7,7 +7,6 @@ from src.data_loader import EMData
 from src.model.model import DetectionModel, UnetOutputShape
 from src.model.loss import CustomCrossEntropy
 from src.gp_filters import AddChannelDim, RemoveChannelDim, TransposeDims
-from src.directory_organisor import create_unique_directory_file
 from config.load_configs import TRAINING_CONFIG
 
 class Training():
@@ -17,6 +16,48 @@ class Training():
                 training_has_mask = TRAINING_CONFIG.has_mask,
                 input_shape = TRAINING_CONFIG.input_shape
                 ):
+        """
+            Class for training a vesicle detection model. 
+
+            Attributes 
+            -------------------
+            zarr_path:
+                The path to the zarr group containing the data. 
+            training_data:
+                An instance of the EMData class, corresponding to the training data. 
+            validate_data:
+                An instance of the EMData class, corresponding to the validation data.
+            raw_channels:
+                The number of channels in the raw data. 
+            detection_model:
+                The model to be trained: an instance of the DetectionModel class.
+            input_shape:
+                The input shape for the model. 
+            input_size:
+                The size (in physical units) of the input image.
+            raw_channels:
+                The number of channels in the raw data. 
+            output_shape:
+                The shape of the image that comes out the UNet.
+            output_size:
+                The size (in physical units) of the output image.
+            border:
+                The border shape between the output image and input image. 
+            border_size:
+                The border size (in physical units) between the output image and input image.
+            predict_shape:
+                The shape of the prediction image. 
+            predict_size:
+                The size (in physical units) of the prediction image.
+            loss:
+                The loss function used for training. 
+            optimizer:
+                The optimizer used for training. 
+            device:
+                The device (e.g. 'cuda') training should be run on. 
+            date:
+                The date training was run. 
+        """
           
         # Load in the data and create target arrays
         self.zarr_path = zarr_path
@@ -98,18 +139,30 @@ class Training():
                 self,
                 augmentations = TRAINING_CONFIG.augmentations,
                 batch_size = TRAINING_CONFIG.batch_size,
-                snapshot_every = TRAINING_CONFIG.snapshot_every,
-                #checkpoint_path = TRAINING_CONFIG.checkpoint_path,
-                outdir = None
+                snapshot_every = TRAINING_CONFIG.snapshot_every
                 ):
         
-        # if checkpoint_path == None:
-        #     # Create directory for saving model checkpoints
-        #     self.checkpoint_path = create_unique_directory_file(f'Model_checkpoints/{self.date}')
-        #     os.makedirs(self.checkpoint_path, exist_ok=True)
+        """
+            Training pipeline for vesicle detection. Images are processed using gunpowder, 
+            and training configurations should be controlled using the training_config.yaml file. 
 
-        # else: 
-        #     self.checkpoint_path = checkpoint_path
+            Parameters 
+            -------------------
+            augmentations (list):
+                A list of the augmentations used by gunpowder. Default set using training_config.yaml. 
+            batch_size (int):
+                The number of training image batches that should be run before updating the model. 
+                Default set using training_config.yaml. 
+            snapshot_every (int):
+                To be completed.
+
+            Returns 
+            -------------------
+            pipline (gunpowder pipeline):
+                The pipeline used for training (e.g. random location, augmentations, model, ...).
+            request (gunpowder BatchRequest):
+                The request to be provided to the pipeline when running training. 
+        """
 
         # Set the model to train mode
         self.detection_model.train()
@@ -205,6 +258,18 @@ class Training():
 class TrainingStatistics:
 
     def __init__(self):
+        """
+            Class to store statistics of a training run. 
+
+            Attributes
+            -------------------
+            iterations:
+                List containing the iteration numbers of stored statistics.
+            loss:
+                The loss of the iteration. 
+            times:
+                The time taken for that training run. 
+        """
         self.iterations = []
         self.losses = []
         self.times = []
