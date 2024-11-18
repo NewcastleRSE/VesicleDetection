@@ -49,7 +49,7 @@ def Apply(zarr_path: str, model_checkpoint: str):
                             checkpoint = model_checkpoint)
     
     # Display the border of the output predicition compared to input shape 
-    predictor.print_border_message()
+    #predictor.print_border_message()
     
     # Get probablities
     ret = predictor.predict_pipeline()

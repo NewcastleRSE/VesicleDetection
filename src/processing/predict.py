@@ -137,7 +137,6 @@ class Prediction:
         pipeline = source
 
         pipeline += gp.Pad(raw, None)
-        #pipeline += gp.Pad(raw, (self.input_size-self.output_size)/2)
 
         pipeline += gp.Normalize(raw)
 
@@ -164,9 +163,15 @@ class Prediction:
         pipeline += gp.Scan(scan_request)
 
         total_request = gp.BatchRequest()
-        total_request.add(raw, self.predict_size)
-        total_request.add(prediction, self.predict_size - self.border_size*2)
-
+        # Want to increase the ROI of raw by 2*border_size and offset it by -1*border_size.
+        # This will allow us to produce a prediction on the entire raw dataset, as the border
+        # obtained from the UNet is exactly accounted for. 
+        offset = (-1*self.border_size[0], -1*self.border_size[1], -1*self.border_size[2])
+        shape = (self.predict_size[0]+2*self.border_size[0], 
+                 self.predict_size[1]+2*self.border_size[1], 
+                 self.predict_size[2]+2*self.border_size[2])
+        total_request[raw] = gp.Roi(offset=offset, shape=shape)
+        total_request[prediction] = gp.Roi(offset=(0,0,0),shape=self.predict_size)
 
         with gp.build(pipeline):
             batch = pipeline.request_batch(total_request)

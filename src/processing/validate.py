@@ -83,7 +83,7 @@ def validate(
 
     border = predictor.border
     loss_function = CustomCrossEntropy(weight=[0.01, 1.0, 1.0]).to(device)
-    target_data = validation_data.target_data[border[0]:-1*border[0], border[1]:-1*border[1], border[2]:-1*border[2]]
+    target_data = validation_data.target_data[:,:,:] #border[0]:-1*border[0], border[1]:-1*border[1], border[2]:-1*border[2]]
 
     # Add axis for minibatch size and send to device 
     prediction_data_tensor = torch.tensor(ret['prediction'].data[np.newaxis]).to(device)
