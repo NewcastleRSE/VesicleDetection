@@ -28,9 +28,13 @@ def convert_to_zarr_train():
     pos_files_train = sorted(glob.glob(os.path.join(pos_dir_train, '*.tif')))
     neg_files_train = sorted(glob.glob(os.path.join(neg_dir_train, '*.tif')))
 
+    # Read in the raw, pos and neg data. Pos and neg data is converted so all labels have values
+    # 1 and 2, respectively. 
     raw_train = np.array([skimage.io.imread(r) for r in raw_files_train])
-    pos_train = np.array([skimage.io.imread(s) for s in pos_files_train]).astype(np.uint64)
-    neg_train = np.array([skimage.io.imread(s) for s in neg_files_train]).astype(np.uint64)
+    pos_train = np.array([skimage.io.imread(s) for s in pos_files_train]).astype(bool)
+    pos_train = pos_train.astype(np.uint64)
+    neg_train = np.array([skimage.io.imread(s) for s in neg_files_train]).astype(bool)
+    neg_train = neg_train.astype(np.uint64)*2 
 
     # Check for stacks of images
     if (raw_train.shape[0] == 1) and (pos_train.shape[0] ==1) and (neg_train.shape[0]==1):
@@ -71,9 +75,13 @@ def convert_to_zarr_train():
     pos_files_validate = sorted(glob.glob(os.path.join(pos_dir_validate, '*.tif')))
     neg_files_validate = sorted(glob.glob(os.path.join(neg_dir_validate, '*.tif')))
 
+    # Read in the raw, pos and neg data. Pos and neg data is converted so all labels have values
+    # 1 and 2, respectively. 
     raw_validate = np.array([skimage.io.imread(r) for r in raw_files_validate])
-    pos_validate = np.array([skimage.io.imread(s) for s in pos_files_validate]).astype(np.uint64)
-    neg_validate = np.array([skimage.io.imread(s) for s in neg_files_validate]).astype(np.uint64)
+    pos_validate = np.array([skimage.io.imread(s) for s in pos_files_validate]).astype(bool)
+    pos_validate = pos_validate.astype(np.uint64)
+    neg_validate = np.array([skimage.io.imread(s) for s in neg_files_validate]).astype(bool)
+    neg_validate = neg_validate.astype(np.uint64)*2
 
     # Check for stacks of images
     if (raw_validate.shape[0] == 1) and (pos_validate.shape[0] ==1) and (neg_validate.shape[0]==1):

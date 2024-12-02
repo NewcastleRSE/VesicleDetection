@@ -5,6 +5,8 @@ import numpy as np
 from skimage import exposure
 from torch.utils.data import Dataset
 
+from config.load_configs import TRAINING_CONFIG
+
 
 class EMData(Dataset):
 
@@ -131,6 +133,9 @@ class EMData(Dataset):
                     self.has_target = True
                     self.target_data_path = f"/{self.mode}/target"
                     self.target_data = self.data[self.mode]["target"]
+                    # Check to see if the target data is at least as big as the input shape
+                    if self.target_data.shape < TRAINING_CONFIG.input_shape:
+                        self.has_target = False
                 else:
                     self.has_target = False
 
@@ -214,8 +219,29 @@ class EMData(Dataset):
         # Open the zarr file in read and write mode
         f = zarr.open(self.zarr_path + "/" + self.mode , mode='r+')
 
-        # create a new zarr array which is equivalent to gt but with changed datatype
-        f['target'] = f['gt'].astype(data_type)
+        # change data type of gt
+        gt = f['gt'].astype(data_type)
+
+        # Check if the gt data is at least as big as the input shape for the model
+        if gt.shape < TRAINING_CONFIG.input_shape:
+    
+            diff_z = TRAINING_CONFIG.input_shape[0] - gt.shape[0]
+            diff_y = TRAINING_CONFIG.input_shape[1] - gt.shape[1]
+            diff_x = TRAINING_CONFIG.input_shape[2] - gt.shape[2]
+
+            # Account for dimesions with gt.shape[i] > input_shape[i]
+            if diff_z < 0:
+                diff_z = 0
+            if diff_y < 0:
+                diff_y =0
+            if diff_x <0:
+                diff_x = 0 
+
+            # Pad gt to account for difference between input shape
+            gt = np.pad(gt, ((0, diff_z), (0, diff_y), (0, diff_x)), 'constant')
+
+        # Create target zarr array
+        f['target'] = gt
         
         # Copy over attributes from gt to target
         for atr in f['gt'].attrs:

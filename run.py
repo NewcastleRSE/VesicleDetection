@@ -248,6 +248,7 @@ class Run():
 
         # Create summary dictionary for summary json file
         summary_dict = {}
+        summary_dict['Data used'] = self.zarr_path
         summary_dict[f"Best {TRAINING_CONFIG.best_score_name}"] = self.best_score
         summary_dict["PC+ predictions"] = pos_labels
         summary_dict["PC- predictions"] = neg_labels
