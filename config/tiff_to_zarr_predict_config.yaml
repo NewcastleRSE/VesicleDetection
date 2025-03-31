@@ -8,8 +8,8 @@ attributes:
   - 0
   - 0
   resolution: !!python/tuple
-  - 60
-  - 60
-  - 60
-output_zarr_path: data/19-13_validation.zarr
-path_to_raw_tiff: data/TIF_data/19-13_ground_truth/predict
+  - 1
+  - 1
+  - 1
+output_zarr_path: data/name/predict
+path_to_raw_tiff: ''

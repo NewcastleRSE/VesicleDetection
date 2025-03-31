@@ -221,6 +221,7 @@ class Training():
         
         for augmentation in augmentations:
             pipeline += augmentation
+            pipeline += gp.IntensityAugment(raw, 0.9,1.1,-0.1,0.1)
 
         if self.training_data.has_mask:
             loss_inputs = {0: prediction, 1: target, 2: mask}

@@ -70,8 +70,8 @@ class DetectionModel(torch.nn.Module):
     
         else: 
             # For isotropic data matching kernel size 
-            self.kernel_size_down = [[(3,) + (3,)*(dims-1), (1,) + (3,)*(dims-1)]]*levels
-            self.kernel_size_up = [[(3,) + (3,)*(dims-1), (1,) + (3,)*(dims-1)]]*(levels - 1)
+            self.kernel_size_down = [[(3,) + (3,)*(dims-1), (3,) + (3,)*(dims-1)]]*levels
+            self.kernel_size_up = [[(3,) + (3,)*(dims-1), (3,) + (3,)*(dims-1)]]*(levels - 1)
 
         torch.manual_seed(18) 
         

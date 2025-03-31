@@ -18,7 +18,7 @@ training_config["checkpoint_path"] = None
 training_config["snapshot_every"] = 0 
 training_config["iterations"] = 1000
 training_config["val_every"] = 100
-training_config["best_score_name"] = 'fscore' # Options: 'fscore', 'recall' or 'precision'
+training_config["best_score_name"] = 'fscore_average' # Options: 'fscore_{1,2,average}', 'recall_{1,2,average}' or 'precision_{1,2,average}'
 training_config["save_every"] = 100
 
 post_processing_config = dict()
