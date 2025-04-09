@@ -45,6 +45,7 @@ class PostProcessingConfigs:
 
         self.combine_pos_neg = config["combine_pos_neg"]
         self.maxima_threshold = config["maxima_threshold"]
+        self.bias = config["bias"]
         
         for key, value in zip(config.keys(), config.values()):
              if not hasattr(PostProcessingConfigs, key):

@@ -26,7 +26,12 @@ class HoughCandidate:
 
 class HoughDetector:
 
-    def __init__(self, pred_pos, pred_neg, voxel_size, combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg):
+    def __init__(self, 
+                 pred_pos, 
+                 pred_neg, 
+                 voxel_size, 
+                 combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg,
+                 bias = 1):
         """
             Post processing class for output of vesicle detection model. 
 
@@ -40,6 +45,10 @@ class HoughDetector:
                 Whether to combine the probabilities for PC+ and PC- detection. If set to true, this will 
                 result in a post processing procedure that favours finding vesicle existance and later labelling, 
                 rather than looking for PC+ and PC- vesicles independently. 
+            bias:
+                A bias factor for the labelling of vesicle candidates. Enters as maxima_pos < bias * maxima_neg, 
+                so bias greater than 1 favours PC- labelling while bias less than 1 favours PC+. Only used when 
+                combine_pos_neg = True.
             voxel_size:
                 The voxel size of the image.
             balls:
@@ -54,8 +63,7 @@ class HoughDetector:
                 Vesicle candidates that are accepted after elimination process (e.g. thresholding and asserting
                 non-overlap of vesicles).
             prediction_result:
-                The array containing the vesicle prediction after post processing.
-            
+                The array containing the vesicle prediction after post processing.     
         """
 
         self.pred_pos_data = pred_pos
@@ -63,6 +71,7 @@ class HoughDetector:
         self.combine_pos_neg = combine_pos_neg
         self.voxel_size = voxel_size
         self.balls = {}
+        self.bias = bias
 
     def hough_prediction(self, threshold):
         """
@@ -102,7 +111,7 @@ class HoughDetector:
                                             ]
             
             # Get labels
-            labels = (maxima_pos < maxima_neg).astype(np.uint8) + 1
+            labels = (maxima_pos < self.bias * maxima_neg).astype(np.uint8) + 1
 
             # Get candidates and sort in decreasing order
             candidates = {}

@@ -1,2 +1,3 @@
 combine_pos_neg: true
-maxima_threshold: 60
+maxima_threshold: 20
+bias: 5

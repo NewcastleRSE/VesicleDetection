@@ -85,6 +85,9 @@ This file provides details on each config file, with a brief description of what
   ### maxima_threshold 
   > The threshold used to determine whether a candidate vesicle is accepted, i.e. a threshold for the confidence score of the model.
 
+  ### bias 
+  > A bias factor for the labelling of vesicle candidates. Enters as maxima_pos < bias * maxima_neg, so bias greater than 1 favours PC- labelling while bias less than 1 favours PC+. Only used when combine_pos_neg = True and will only apply when running pure prediction (i.e. validations have bias = 1).
+
 </details>
 
 ## Tiff to Zarr Train Config

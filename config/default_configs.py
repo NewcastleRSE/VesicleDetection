@@ -24,6 +24,7 @@ training_config["save_every"] = 100
 post_processing_config = dict()
 post_processing_config["combine_pos_neg"] = True
 post_processing_config["maxima_threshold"] = 50 
+post_processing_config["bias"] = 2
 
 tiff_to_zarr_train_config = dict()
 tiff_to_zarr_train_config['path_to_raw_tiff_train'] = ''

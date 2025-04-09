@@ -12,6 +12,7 @@ from src.directory_organisor import create_unique_directory_file
 from src.visualisation import imshow_napari_prediction
 
 from config.load_configs import TRAINING_CONFIG
+from config.load_configs import POST_PROCESSING_CONFIG
 
 def Apply(zarr_path: str, model_checkpoint: str):
     """
@@ -60,7 +61,8 @@ def Apply(zarr_path: str, model_checkpoint: str):
     # Post process with hough detector
     hough_detection = HoughDetector(pred_pos = pos_pred_data,
                                     pred_neg = neg_pred_data,
-                                    voxel_size = data.voxel_size)
+                                    voxel_size = data.voxel_size,
+                                    bias = POST_PROCESSING_CONFIG.bias)
     hough_detection.process()
     hough_pred = hough_detection.prediction_result
     
