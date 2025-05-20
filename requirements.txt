@@ -5,6 +5,7 @@ zarr == 2.18.2
 matplotlib == 3.9.2
 napari[all] 
 cython == 3.0.11
+numcodecs == 0.15.1
 funlib-learn-torch @ git+https://github.com/funkelab/funlib.learn.torch.git
 funlib-evaluate @ git+https://github.com/funkelab/funlib.evaluate.git
 PyYAML == 6.0.2
