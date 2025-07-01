@@ -76,16 +76,20 @@ if __name__ == "__main__":
         exit_on_error=True)
 
     parser.add_argument(
-        'input_filename', action='store', type=str,
+        'input_image_filename', action='store', type=str,
         help='The filename of the input image to crop.')
 
     parser.add_argument(
-        '-o', '--output_filename', action='store', default=None, type=str, required=False,
-        help='The filename of the output cropped image. Default is crop_<input_filename>')
+        '-o', '--output_image_filename', action='store', default=None, type=str, required=False,
+        help='The filename of the output cropped image. Default is <input_image_filename_no_extension>_crop<input_image_file_extension>.')
+
+    parser.add_argument(
+        '-s', '--output_range_filename', action='store', default=None, type=str, required=False,
+        help='The JSON filename with the index ranges used to crop the image. Default is <output_image_filename_no_extension>_range.json')
 
     parser.add_argument(
         '-r', '--ranges', action='store', type=str, required=False,
-        help='The JSON list of index ranges of image to crop.')
+        help='The JSON string with the index ranges of image to crop. For instance, the string "[[100, 200], [300, 500, 2]]" will crop the image with:\n`image = image[tuple([slice(100, 200, 1), slice(300, 500, 2)])]`\nInstead, the the string "[[300], []]" will crop the image with:\n`image = image[tuple([slice(0, 300, 1), slice(0, image.shape[1], 1)])]`\n')
 
     parser.add_argument(
         '-c', '--dim_channel', action='store', default=None, type=int, required=False,
@@ -93,33 +97,47 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    if args.output_filename is None:
-        dirname, basename = os.path.split(args.input_filename)
+    if args.output_image_filename is None:
+        dirname, basename = os.path.split(args.input_image_filename)
         basename_no_ext, ext = os.path.splitext(basename)
-        args.output_filename = os.path.join(basename_no_ext + '_crop' + ext)
+        args.output_image_filename = os.path.join(basename_no_ext + '_crop' + ext)
 
-    image = load_image(filename=args.input_filename)
+    os.makedirs(os.path.dirname(args.output_image_filename), exist_ok=True)
 
-    print(args.dim_channel)
+    if args.output_range_filename is None:
+        output_image_filename_no_ext, ext = os.path.splitext(args.output_image_filename)
+        args.output_range_filename = os.path.join(output_image_filename_no_ext + '_range.json')
+    else:
+        os.makedirs(os.path.dirname(args.output_range_filename), exist_ok=True)
 
-    if args.ranges is not None:
+    image = load_image(filename=args.input_image_filename)
 
-        args.ranges = json.loads(args.ranges)
+    if args.ranges is None:
 
-        if len(args.ranges) > 0:
+        ranges = []
+    else:
+        ranges = json.loads(args.ranges)
 
-            if args.dim_channel is not None:
-                range_channel = [0, image.shape[args.dim_channel], 1]
-                args.ranges.insert(args.dim_channel, range_channel)
+    if len(ranges) > 0:
 
-            args.ranges = format_ranges(ranges=args.ranges, maxes_stops=image.shape)
+        ranges = format_ranges(ranges=ranges, maxes_stops=image.shape)
 
-            slices = tuple([slice(*range_i) for range_i in args.ranges])
+        slices = [slice(*range_i) for range_i in ranges]
+
+        if args.dim_channel is not None:
+            slice_channel = slice(0, image.shape[args.dim_channel], 1)
+            slices.insert(args.dim_channel, slice_channel)
+
+        image = crop(image=image, indexes=tuple(slices))
+
+    elif args.dim_channel is None:
+        ranges = [[0, shape_a, 1] for shape_a in image.shape]
+    else:
+        ranges = [[0, image.shape[a], 1] for a in range(0, image.ndim, 1) if a != args.dim_channel]
 
 
-            print(slices)
 
-            image = crop(image=image, indexes=slices)
-    
-    save_image(filename=args.output_filename, image=image)
+    with open(args.output_range_filename, "w") as text_file:
+        text_file.write(json.dumps(ranges, indent=2))
 
+    save_image(filename=args.output_image_filename, image=image)
