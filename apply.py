@@ -58,30 +58,34 @@ def Apply(zarr_path: str, model_checkpoint: str):
     pos_pred_data = probs[1,:,:,:].detach().numpy()
     neg_pred_data = probs[2,:,:,:].detach().numpy()
 
-    # Post process with hough detector
-    hough_detection = HoughDetector(pred_pos = pos_pred_data,
-                                    pred_neg = neg_pred_data,
-                                    voxel_size = data.voxel_size,
-                                    bias = POST_PROCESSING_CONFIG.bias)
-    hough_detection.process()
-    hough_pred = hough_detection.prediction_result
+    if not isinstance(POST_PROCESSING_CONFIG.bias, (list, tuple)):
+         POST_PROCESSING_CONFIG.bias = [POST_PROCESSING_CONFIG.bias]
     
-    candidates = hough_detection.accepted_candidates
+    for bias in POST_PROCESSING_CONFIG.bias:
+        # Post process with hough detector
+        hough_detection = HoughDetector(pred_pos = pos_pred_data,
+                                        pred_neg = neg_pred_data,
+                                        voxel_size = data.voxel_size,
+                                        bias = bias)
+        hough_detection.process()
+        hough_pred = hough_detection.prediction_result
+        
+        candidates = hough_detection.accepted_candidates
 
-    date = datetime.today().strftime('%d_%m_%Y')
+        date = datetime.today().strftime('%d_%m_%Y')
 
-    # Create save location
-    save_path = create_unique_directory_file(data_path + f'/predict/Predictions/{date}')
-    save_location = os.path.relpath(save_path, data_path + '/predict')
+        # Create save location
+        save_path = create_unique_directory_file(data_path + f'/predict/Predictions/{date}_bias{bias}')
+        save_location = os.path.relpath(save_path, data_path + '/predict')
 
-    # Save the validation prediction in zarr dictionary. 
-    f = zarr.open(data_path + '/predict', mode='r+')
-    f[save_location + '/Hough_transformed'] = hough_pred
+        # Save the validation prediction in zarr dictionary. 
+        f = zarr.open(data_path + '/predict', mode='r+')
+        f[save_location + '/Hough_transformed'] = hough_pred
 
-    for atr in data.raw_data.attrs:
-        f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
-    
-    return candidates, save_path
+        for atr in data.raw_data.attrs:
+            f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
+        
+    return candidates, save_path # return and visualise only the final bias if there are multiple
 
 if __name__ == "__main__":
         
