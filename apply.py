@@ -1,8 +1,10 @@
-import torch 
-import os 
-import zarr
 
-from datetime import datetime 
+import os
+from datetime import datetime
+import numpy as np
+import skimage.io
+import zarr
+import torch
 
 from src.data_loader import EMData
 from src.processing.predict import Prediction
@@ -14,7 +16,18 @@ from src.visualisation import imshow_napari_prediction
 from config.load_configs import TRAINING_CONFIG
 from config.load_configs import POST_PROCESSING_CONFIG
 
-def Apply(zarr_path: str, model_checkpoint: str):
+
+label_background = 0
+label_pos = 1
+label_neg = 2
+
+
+def Apply(
+        zarr_path: str, model_checkpoint: str,
+        save_all_labels_in_one_tiff_file: bool = False, tiff_file_name_of_all_labels: None | str = None,
+        save_different_labels_in_different_tiff_files: bool = False,
+        tiff_file_names_of_different_labels: None | str = None):
+
     """
         Use a pretrained vesicle detection model to predict vesicles in unlablled data. 
 
@@ -24,8 +37,38 @@ def Apply(zarr_path: str, model_checkpoint: str):
             Path to the zarr group that contains the 'predict' zarr group within it. This 
             path will be fed into the EMData class. 
         model_checkpoint (str):
-            Path to the model that should be used for prediction. 
+            Path to the model that should be used for prediction.
+
+
+        
+
     """
+
+    if isinstance(save_all_labels_in_one_tiff_file, bool):
+
+        if save_all_labels_in_one_tiff_file:
+
+            if tiff_file_name_of_all_labels is None:
+                tiff_file_name_of_all_labels = ''  # todo: define the default tiff file name
+            elif not isinstance(tiff_file_name_of_all_labels, str):
+                raise TypeError('tiff_file_name_of_all_labels must be a string or None')
+
+            # todo save the tiff file
+    else:
+        raise TypeError('save_all_labels_in_one_tiff_file must be a bool')
+
+    if isinstance(save_different_labels_in_different_tiff_files, bool):
+        if save_different_labels_in_different_tiff_files:
+
+            if tiff_file_names_of_different_labels is None:
+                tiff_file_names_of_different_labels = []  # todo: define the default tiff file names
+            elif not isinstance(tiff_file_name_of_all_labels, str):
+                raise TypeError('tiff_file_name_of_all_labels must be a string or None')
+
+            # todo save the tiff files
+    else:
+        raise TypeError('save_different_labels_in_different_tiff_files must be a bool')
+
 
     data = EMData(zarr_path, 'predict', clahe=TRAINING_CONFIG.clahe)
     candidates = None
@@ -65,6 +108,13 @@ def Apply(zarr_path: str, model_checkpoint: str):
                                     bias = POST_PROCESSING_CONFIG.bias)
     hough_detection.process()
     hough_pred = hough_detection.prediction_result
+
+    hough_pred_pos = np.where(hough_pred == label_pos, label_pos, label_background).astype('int8')
+    hough_pred_neg = np.where(hough_pred == label_neg, label_neg, label_background).astype('int8')
+
+    dir_crop = '/home/campus.ncl.ac.uk/ncc222/Projects/neuroscience/data/TIF_data/19-13/subvolume/crops'
+    skimage.io.imsave(os.path.join(dir_crop, 'pos.tif'), hough_pred_pos)
+    skimage.io.imsave(os.path.join(dir_crop, 'neg.tif'), hough_pred_neg)
     
     candidates = hough_detection.accepted_candidates
 
