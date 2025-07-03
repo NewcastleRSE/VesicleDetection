@@ -1,5 +1,6 @@
 import napari
 import zarr
+import sys
 
 def imshow_napari_validation(data_path, prediction_path):
     """
@@ -86,9 +87,15 @@ def imshow_napari_prediction(data_path, prediction_path):
 
 if __name__ == "__main__":
 
-    data_path = input("Provide the path to data zarr container: ")
-    prediction_path = input("Provide the path to prediction zarr container: ")
-    validation_or_predict = input("Is this validation or prediction data? (v/p): ")
+    if len(sys.argv)==4: # assume paths passed to file through command line
+        data_path = sys.argv[1]
+        prediction_path = sys.argv[2]
+        validation_or_predict = sys.argv[3]
+
+    else:
+        data_path = input("Provide the path to data zarr container: ")
+        prediction_path = input("Provide the path to prediction zarr container: ")
+        validation_or_predict = input("Is this validation or prediction data? (v/p): ")
 
     while validation_or_predict.lower() != 'v' and validation_or_predict.lower() != 'p':
         print("-----")
