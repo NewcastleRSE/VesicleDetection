@@ -131,7 +131,9 @@ def Apply(
 
     # Save a single tiff file with all label classes
     if save_all_labels_in_one_tiff_file:
-        os.makedirs(os.path.dirname(tiff_file_name_of_all_labels), exist_ok=True)
+        dirname_tiff = os.path.dirname(tiff_file_name_of_all_labels)
+        if len(dirname_tiff) > 0:
+            os.makedirs(dirname_tiff, exist_ok=True)
         skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred)
 
     # Save a tiff file per label class, excluding the background label
@@ -161,7 +163,10 @@ def Apply(
             hough_pred_l = np.full(shape=hough_pred.shape, fill_value=label_background, dtype=hough_pred.dtype)
             hough_pred_l[hough_pred == label_classes_no_bg[l]] = label_classes_no_bg[l]
 
-            os.makedirs(os.path.dirname(tiff_file_names_of_different_labels[l]), exist_ok=True)
+            dirname_tiff_l = os.path.dirname(tiff_file_names_of_different_labels[l])
+            if len(dirname_tiff_l) > 0:
+                os.makedirs(dirname_tiff_l, exist_ok=True)
+
             skimage.io.imsave(tiff_file_names_of_different_labels[l], hough_pred_l)
 
     return candidates, save_path
