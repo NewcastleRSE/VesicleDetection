@@ -17,19 +17,15 @@ from config.load_configs import TRAINING_CONFIG
 from config.load_configs import POST_PROCESSING_CONFIG
 
 
-label_background = 0
-label_pos = 1
-label_neg = 2
-
-
 def Apply(
         zarr_path: str, model_checkpoint: str,
         save_all_labels_in_one_tiff_file: bool = False, tiff_file_name_of_all_labels: None | str = None,
         save_different_labels_in_different_tiff_files: bool = False,
-        tiff_file_names_of_different_labels: None | str = None):
+        tiff_file_names_of_different_labels: None | str = None,
+        label_background=0, dtype_labels=None):
 
     """
-        Use a pretrained vesicle detection model to predict vesicles in unlablled data. 
+        Use a pretrained vesicle detection model to predict vesicles in unlabelled data.
 
         Parameters 
         -------------------
@@ -40,7 +36,7 @@ def Apply(
             Path to the model that should be used for prediction.
 
 
-        
+
 
     """
 
@@ -49,11 +45,9 @@ def Apply(
         if save_all_labels_in_one_tiff_file:
 
             if tiff_file_name_of_all_labels is None:
-                tiff_file_name_of_all_labels = ''  # todo: define the default tiff file name
+                tiff_file_name_of_all_labels = os.path.join('predicted_labels', 'tiffs', 'labels_all.tif')
             elif not isinstance(tiff_file_name_of_all_labels, str):
                 raise TypeError('tiff_file_name_of_all_labels must be a string or None')
-
-            # todo save the tiff file
     else:
         raise TypeError('save_all_labels_in_one_tiff_file must be a bool')
 
@@ -61,11 +55,19 @@ def Apply(
         if save_different_labels_in_different_tiff_files:
 
             if tiff_file_names_of_different_labels is None:
-                tiff_file_names_of_different_labels = []  # todo: define the default tiff file names
-            elif not isinstance(tiff_file_name_of_all_labels, str):
-                raise TypeError('tiff_file_name_of_all_labels must be a string or None')
-
-            # todo save the tiff files
+                n_tiff_file_names_of_different_labels = None
+            elif isinstance(tiff_file_names_of_different_labels, str):
+                tiff_file_names_of_different_labels = [tiff_file_names_of_different_labels]
+                n_tiff_file_names_of_different_labels = 1
+            elif isinstance(tiff_file_names_of_different_labels, (list, tuple)):
+                n_tiff_file_names_of_different_labels = len(tiff_file_names_of_different_labels)
+                for i in range(0, n_tiff_file_names_of_different_labels, 1):
+                    if not isinstance(tiff_file_names_of_different_labels[i], str):
+                        raise TypeError('Each Element of tiff_file_names_of_different_labels must be a string')
+            else:
+                raise TypeError('tiff_file_names_of_different_labels must be a None, string, list or tuple')
+        else:
+            n_tiff_file_names_of_different_labels = None
     else:
         raise TypeError('save_different_labels_in_different_tiff_files must be a bool')
 
@@ -97,9 +99,9 @@ def Apply(
     
     # Get probablities
     ret = predictor.predict_pipeline()
-    probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data))
-    pos_pred_data = probs[1,:,:,:].detach().numpy()
-    neg_pred_data = probs[2,:,:,:].detach().numpy()
+    probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data)).detach().numpy()
+    pos_pred_data = probs[1,:,:,:]
+    neg_pred_data = probs[2,:,:,:]
 
     # Post process with hough detector
     hough_detection = HoughDetector(pred_pos = pos_pred_data,
@@ -109,13 +111,9 @@ def Apply(
     hough_detection.process()
     hough_pred = hough_detection.prediction_result
 
-    hough_pred_pos = np.where(hough_pred == label_pos, label_pos, label_background).astype('int8')
-    hough_pred_neg = np.where(hough_pred == label_neg, label_neg, label_background).astype('int8')
+    if dtype_labels is not None:
+        hough_pred = hough_pred.astype(dtype=dtype_labels)
 
-    dir_crop = '/home/campus.ncl.ac.uk/ncc222/Projects/neuroscience/data/TIF_data/19-13/subvolume/crops'
-    skimage.io.imsave(os.path.join(dir_crop, 'pos.tif'), hough_pred_pos)
-    skimage.io.imsave(os.path.join(dir_crop, 'neg.tif'), hough_pred_neg)
-    
     candidates = hough_detection.accepted_candidates
 
     date = datetime.today().strftime('%d_%m_%Y')
@@ -124,13 +122,48 @@ def Apply(
     save_path = create_unique_directory_file(data_path + f'/predict/Predictions/{date}')
     save_location = os.path.relpath(save_path, data_path + '/predict')
 
-    # Save the validation prediction in zarr dictionary. 
+    # Save the validation prediction in zarr dictionary.
     f = zarr.open(data_path + '/predict', mode='r+')
     f[save_location + '/Hough_transformed'] = hough_pred
 
     for atr in data.raw_data.attrs:
         f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
-    
+
+    # Save a single tiff file with all label classes
+    if save_all_labels_in_one_tiff_file:
+        os.makedirs(os.path.dirname(tiff_file_name_of_all_labels), exist_ok=True)
+        skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred)
+
+    # Save a tiff file per label class, excluding the background label
+    if save_different_labels_in_different_tiff_files:
+
+        n_label_classes = probs.shape[0]
+        label_classes = [l for l in range(0, n_label_classes, 1)]
+
+        label_classes_no_bg = [l for l in range(0, n_label_classes, 1) if l != label_background]
+
+        n_label_classes_no_bg = len(label_classes_no_bg)
+
+        if tiff_file_names_of_different_labels is None:
+            tiff_file_names_of_different_labels = [
+                os.path.join('predicted_labels', 'tiffs', 'labels_{label:0>3d}.tif'.format(label=label_l))
+                for label_l in label_classes_no_bg]
+            n_tiff_file_names_of_different_labels = len(tiff_file_names_of_different_labels)
+        elif n_tiff_file_names_of_different_labels == n_label_classes_no_bg:
+            pass
+        else:
+            raise TypeError(
+                'tiff_file_names_of_different_labels must have the same number file names as the label classes '
+                'predicted by the model, excluding the background label.')
+
+        for l in range(0, n_label_classes_no_bg, 1):
+
+            hough_pred_l = np.full(shape=hough_pred.shape, fill_value=label_background, dtype=hough_pred.dtype)
+            hough_pred_l[hough_pred == label_classes_no_bg[l]] = label_classes_no_bg[l]
+
+            os.makedirs(os.path.dirname(tiff_file_names_of_different_labels[l]), exist_ok=True)
+            skimage.io.imsave(tiff_file_names_of_different_labels[l], hough_pred_l)
+
     return candidates, save_path
 
 if __name__ == "__main__":
@@ -152,7 +185,11 @@ if __name__ == "__main__":
 
     print("-----")
 
-    candidates, save_location = Apply(zarr_path=data_path, model_checkpoint=model_checkpoint)
+    candidates, save_location = Apply(
+        zarr_path=data_path, model_checkpoint=model_checkpoint,
+        save_all_labels_in_one_tiff_file=True, tiff_file_name_of_all_labels= None,
+        save_different_labels_in_different_tiff_files=True, tiff_file_names_of_different_labels= None,
+        label_background=0, dtype_labels='int8')
 
     pos_labels = 0 
     neg_labels = 0
