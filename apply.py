@@ -333,7 +333,7 @@ if __name__ == "__main__":
     else:
         show = visualise.lower() == 'y'
 
-    biases = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4]
+    biases = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5]
 
     print("-----")
 
