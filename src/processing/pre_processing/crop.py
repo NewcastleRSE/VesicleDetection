@@ -2,7 +2,7 @@
 import argparse
 import os
 import json
-import skimage.io 
+import skimage.io
 
 
 
