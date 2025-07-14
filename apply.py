@@ -334,7 +334,7 @@ if __name__ == "__main__":
         show = visualise.lower() == 'y'
 
     biases = [1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4]
-    biases = [5]
+
     print("-----")
 
     apply = Apply(model_checkpoint=model_checkpoint, label_background=0)
