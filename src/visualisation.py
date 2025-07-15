@@ -87,6 +87,21 @@ def imshow_napari_prediction(data_path, prediction_path):
     viewer.add_image(data=hough_transformed, name='Hough Transformed', blending='additive', colormap='inferno', translate=padding)
     napari.run()
 
+
+def show_prediction(raw_data, labels):
+
+
+    # Obtain difference between input shape and output shape, to allow alignment in napari
+    padding = [
+        int((raw_data.shape[0] - labels.shape[0])/2),
+        int((raw_data.shape[1] - labels.shape[1])/2),
+        int((raw_data.shape[2] -labels.shape[2])/2)]
+
+    viewer = napari.Viewer()
+    viewer.add_image(data=raw_data, name='Raw')
+    viewer.add_image(data=labels, name='Hough Transformed', blending='additive', colormap='inferno', translate=padding)
+    napari.run()
+
 if __name__ == "__main__":
 
     if len(sys.argv)==4: # assume paths passed to file through command line
