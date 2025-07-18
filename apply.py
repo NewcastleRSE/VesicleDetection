@@ -192,7 +192,7 @@ class Apply:
             dirname_tiff = os.path.dirname(tiff_file_name_of_all_labels)
             if len(dirname_tiff) > 0:
                 os.makedirs(dirname_tiff, exist_ok=True)
-            skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred)
+            skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred, plugin='tifffile', check_contrast=False)
 
         # Save a tiff file per label class, excluding the background label
         if save_different_labels_in_different_tiff_files:
@@ -226,7 +226,8 @@ class Apply:
                 if len(dirname_tiff_l) > 0:
                     os.makedirs(dirname_tiff_l, exist_ok=True)
 
-                skimage.io.imsave(tiff_file_names_of_different_labels[l], hough_pred_l)
+                skimage.io.imsave(
+                    tiff_file_names_of_different_labels[l], hough_pred_l, plugin='tifffile', check_contrast=False)
 
         if show:
             show_prediction(data.numpy(), hough_pred)
@@ -235,6 +236,7 @@ class Apply:
 
     def predict_labels(
             self, data, biases=1.0,
+            do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
             do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
             do_save_single_label_tiffs=False,
             file_name_of_single_label_tiffs=None,
@@ -256,14 +258,14 @@ class Apply:
         :type do_save_multi_label_tiff: bool
 
         :param file_name_of_multi_label_tiff: The name of the tiff file.
-        :type file_name_of_multi_label_tiff: str | None
+        :type file_name_of_multi_label_tiff: list[str] | tuple[str] | None
 
         :param do_save_single_label_tiffs: If True, it saves the different predicted labels in
           different tiff files. One tiff file per label class. The default is False.
         :type do_save_single_label_tiffs: bool
 
         :param file_name_of_single_label_tiffs: The names of the tiffs files.
-        :type file_name_of_single_label_tiffs: str | list[str] | tuple[str] | None
+        :type file_name_of_single_label_tiffs: list[list[str]] | tuple[tuple[str]] | None
 
         :param dtype_labels: Optional numpy data type of the predicted labels. If it is None (Default), numpy will
           decide it (usually int64).
@@ -273,6 +275,8 @@ class Apply:
         :type show: bool
 
         """
+
+        # todo: check and format of the arguments
 
         if biases is None:
             biases = 1.0
@@ -309,30 +313,32 @@ class Apply:
             labels[b], candidates[b] = self.hough_detection(
                 probs=probs, voxel_size=data.voxel_size, bias=biases[b], dtype_labels=dtype_labels)
 
-            self.save_labels(la)
+            self.save_labels(
+                labels=labels[b],
 
+                do_save_multi_label_zarr=do_save_multi_label_zarr,
+                dirname_of_multi_label_zarr=(
+                    None if (not do_save_multi_label_zarr) or (dirname_of_multi_label_zarr is None)
+                    else dirname_of_multi_label_zarr[b]),
 
-            candidates[b] = self.single_image_single_bias(
-                data=data, bias=biases[b],
+                raw_data_attrs=data.raw_data.attrs,
 
-                save_all_labels_in_one_tiff_file=do_save_multi_label_tiff,
-
-                tiff_file_name_of_all_labels=(
-                    None
-                    if (not do_save_multi_label_tiff) or (file_name_of_multi_label_tiff is None)
+                do_save_multi_label_tiff=do_save_multi_label_tiff,
+                file_name_of_multi_label_tiff=(
+                    None if (not do_save_multi_label_tiff) or (file_name_of_multi_label_tiff is None)
                     else file_name_of_multi_label_tiff[b]),
 
-                save_different_labels_in_different_tiff_files=do_save_single_label_tiffs,
-
-                tiff_file_names_of_different_labels=(
-                    None
-                    if (not do_save_single_label_tiffs) or
-                       (file_name_of_single_label_tiffs is None)
+                do_save_single_label_tiffs=do_save_single_label_tiffs,
+                file_name_of_single_label_tiffs=(
+                    None if (not do_save_single_label_tiffs) or (file_name_of_single_label_tiffs is None)
                     else file_name_of_single_label_tiffs[b]),
 
-                dtype_labels=dtype_labels, show=show)
+                bias=biases[b])
 
-        return candidates
+        if show:
+            show_prediction(data.numpy(), labels)
+
+        return probs, labels, candidates
 
     def predict_probs(self, data):
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using different biases.
@@ -437,21 +443,16 @@ class Apply:
         return hough_pred, candidates
 
     def save_labels(
-            self, labels, bias=None,
-            do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None, raw_data_attributs=None,
+            self, labels,
+            do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None, raw_data_attrs=None,
             do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
-            do_save_single_label_tiffs=False,
-            file_name_of_single_label_tiffs=None):
+            do_save_single_label_tiffs=False, file_name_of_single_label_tiffs=None,
+            bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
-        :param data: The raw data to be predicted.
-        :type data: EMData
-
-        :param bias: A factor biasing the labelling of vesicle candidates. It labels a candidate as PC- if
-          maxima_pos is less than bias * maxima_neg. Otherwise, it labels it as PC+. So, a bias greater than 1 favours
-          PC- labelling while a bias less than 1 favours PC+.
-        :type bias: int | float | None
+        :param labels: An Array containing the labels of the raw image.
+        :type labels: np.ndarray | torch.Tensor
 
         :param do_save_multi_label_tiff: If True, it saves all predicted labels in one tiff file. The default is
           False.
@@ -467,40 +468,39 @@ class Apply:
         :param file_name_of_single_label_tiffs: The names of the tiffs files.
         :type file_name_of_single_label_tiffs: str | list[str] | tuple[str] | None
 
+        :param bias: The bias used in the hough detection.
+        :type bias: int | float | None
+
         """
 
         if do_save_multi_label_zarr:
-            self.save_multi_label_zarr()
+            self.save_multi_label_zarr(
+                labels=labels, dirname_zarr=dirname_of_multi_label_zarr, raw_data_attrs=raw_data_attrs, bias=bias)
 
         if isinstance(do_save_multi_label_tiff, bool):
-
             if do_save_multi_label_tiff:
-
-                self.save_multi_label_tiff()
-
+                self.save_multi_label_tiff(labels=labels, file_name=file_name_of_multi_label_tiff, bias=bias)
         else:
             raise TypeError('do_save_multi_label_tiff must be a bool')
 
         if isinstance(do_save_single_label_tiffs, bool):
             if do_save_single_label_tiffs:
-
-                self.save_single_label_tiffs()
-
+                self.save_single_label_tiffs(labels=labels, file_names=file_name_of_single_label_tiffs, bias=bias)
         else:
             raise TypeError('do_save_single_label_tiffs must be a bool')
 
         return None
 
-    def save_multi_label_zarr(self, labels, zarr_path, raw_data_attrs, bias=None):
+    def save_multi_label_zarr(self, labels, dirname_zarr, raw_data_attrs, bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
-        :param labels: An Array containing the labels of an image.
+        :param labels: An Array containing the labels of the raw image.
         :type labels: np.ndarray | torch.Tensor
 
-        :param zarr_path: Path to the zarr group that contains the 'predict' zarr group within it. This path will be fed
+        :param dirname_zarr: Path to the zarr group that contains the 'predict' zarr group within it. This path will be fed
           into the EMData class.
-        :type zarr_path: str
+        :type dirname_zarr: str
 
         :param raw_data_attrs: The attributes of the zarr container. They are stored in data.raw_data.attrs.
 
@@ -518,9 +518,8 @@ class Apply:
         date = datetime.today().strftime('%Y-%m-%d')
 
         # Create save location
-        # todo: define the zarr path outside the function
 
-        save_path = os.path.join(zarr_path, 'predict', 'Predictions')
+        save_path = os.path.join(dirname_zarr, 'predict', 'Predictions')
 
         if bias is None:
             save_path = os.path.join(save_path, 'date_{date:s}'.format(date=date))
@@ -531,10 +530,10 @@ class Apply:
 
         save_path = create_unique_directory_file(save_path)
 
-        save_location = os.path.relpath(save_path, zarr_path + '/predict')
+        save_location = os.path.relpath(save_path, dirname_zarr + '/predict')
 
         # Save the validation prediction in zarr dictionary.
-        f = zarr.open(zarr_path + '/predict', mode='r+')
+        f = zarr.open(dirname_zarr + '/predict', mode='r+')
         f[save_location + '/Hough_transformed'] = labels
 
         for atr in raw_data_attrs:
@@ -546,11 +545,11 @@ class Apply:
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
-        :param labels: An Array containing the labels of an image.
+        :param labels: An Array containing the labels of the raw image.
         :type labels: np.ndarray | torch.Tensor
 
         :param file_name: The names of the files.
-        :type file_name: str | list[str] | tuple[str] | None
+        :type file_name: str | None
 
         :param bias: The bias used in the hough detection.
         :type bias: int | float | None
@@ -582,7 +581,7 @@ class Apply:
         if len(dirname) > 0:
             os.makedirs(dirname, exist_ok=True)
 
-        skimage.io.imsave(file_name, labels)
+        skimage.io.imsave(file_name, labels, plugin='tifffile', check_contrast=False)
 
         return None
 
@@ -590,7 +589,7 @@ class Apply:
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
-        :param labels: An Array containing the labels of an image.
+        :param labels: An Array containing the labels of the raw image.
         :type labels: np.ndarray | torch.Tensor
 
         :param file_names: The names of the files.
@@ -654,7 +653,7 @@ class Apply:
             if len(dirname_tiff_l) > 0:
                 os.makedirs(dirname_tiff_l, exist_ok=True)
 
-            skimage.io.imsave(file_names[l], labels_l)
+            skimage.io.imsave(file_names[l], labels_l, plugin='tifffile', check_contrast=False)
 
         return None
 
@@ -704,3 +703,13 @@ if __name__ == "__main__":
             f"bias: {biases[b]:0.3f}",
             f"PC+ predictions: {pos_labels: >9d}",
             f"PC- predictions: {neg_labels: >9d}"]))
+
+
+# todo:
+# - update the visualiser to add multiple layers of labels
+# - define the zarr path outside the function
+# - update the doc stings of the functions
+# - format all input argument of the functions before use
+
+# done
+# - force skimage.io.imsave to save labels as tiff
