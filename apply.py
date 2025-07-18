@@ -66,10 +66,10 @@ class Apply:
 
     def __call__(self, *args, **kwargs):
 
-        return self.single_image_multi_biases(*args, **kwargs)
+        return self.predict_labels(*args, **kwargs)
 
     def single_image_single_bias(
-            self, zarr_path, bias=1.0,
+            self, data, bias=1.0,
             save_all_labels_in_one_tiff_file=False, tiff_file_name_of_all_labels=None,
             save_different_labels_in_different_tiff_files=False,
             tiff_file_names_of_different_labels= None,
@@ -77,9 +77,8 @@ class Apply:
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
-        :param zarr_path: Path to the zarr group that contains the 'predict' zarr group within it. This path will be fed
-          into the EMData class.
-        :type zarr_path: str
+        :param data: The raw data to be predicted.
+        :type data: EMData
 
         :param bias: A factor biasing the labelling of vesicle candidates. It labels a candidate as PC- if
           maxima_pos is less than bias * maxima_neg. Otherwise, it labels it as PC+. So, a bias greater than 1 favours
@@ -153,34 +152,8 @@ class Apply:
         if not isinstance(show, bool):
             raise TypeError('show must be a bool')
 
-        data = EMData(zarr_path, 'predict', clahe=TRAINING_CONFIG.clahe)
-        candidates = None
+        probs = self.predict_probs(data=data)
 
-        # Check if there are multiple channels within the raw data.
-        # This shouldn't be the case for us as EM data is 'colourblind'.
-        if len(data.raw_data.shape) == 3:
-            raw_channels = 1
-        elif len(data.raw_data.shape) == 4:
-            raw_channels = data.raw_data.shape[0]
-
-        # Get an instance of the model
-        detection_model = DetectionModel(
-            raw_num_channels = raw_channels,
-            voxel_size = data.voxel_size)
-
-        # Initiate a prediction
-        predictor = Prediction(
-            data = data,
-            model = detection_model,
-            input_shape = TRAINING_CONFIG.input_shape,
-            checkpoint = self.model_checkpoint)
-
-        # Display the border of the output predicition compared to input shape
-        #predictor.print_border_message()
-
-        # Get probabilities
-        ret = predictor.predict_pipeline()
-        probs = torch.nn.Softmax(dim=0)(torch.tensor(ret['prediction'].data)).detach().numpy()
         pos_pred_data = probs[1,:,:,:]
         neg_pred_data = probs[2,:,:,:]
 
@@ -260,38 +233,37 @@ class Apply:
 
         return candidates
 
-    def single_image_multi_biases(
-            self, zarr_path, biases=1.0,
-            save_all_labels_in_one_tiff_file=False, tiff_file_name_of_all_labels=None,
-            save_different_labels_in_different_tiff_files=False,
-            tiff_file_names_of_different_labels=None,
+    def predict_labels(
+            self, data, biases=1.0,
+            do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
+            do_save_single_label_tiffs=False,
+            file_name_of_single_label_tiffs=None,
             dtype_labels=None, show=False):
 
         # TODO: DOC STRING NEEDS TO UPDATED
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using different biases.
 
-        :param zarr_path: Path to the zarr group that contains the 'predict' zarr group within it. This path will be fed
-          into the EMData class.
-        :type zarr_path: str
+        :param data: The raw data to be predicted.
+        :type data: EMData
 
         :param biases: A list of factors biasing the labelling of vesicle candidates. It labels a candidate as PC- if
           maxima_pos is less than biases[b] * maxima_neg. Otherwise, it labels it as PC+. So, biases greater than 1
           favour PC- labelling while biases less than 1 favour PC+.
         :type biases: int | float | list | tuple | None
 
-        :param save_all_labels_in_one_tiff_file: If True, it saves all predicted labels in one tiff file. The default is
-          False.
-        :type save_all_labels_in_one_tiff_file: bool
+        :param do_save_multi_label_tiff: If True, it saves all predicted labels in one tiff file. The default
+          is False.
+        :type do_save_multi_label_tiff: bool
 
-        :param tiff_file_name_of_all_labels: The name of the tiff file.
-        :type tiff_file_name_of_all_labels: str | None
+        :param file_name_of_multi_label_tiff: The name of the tiff file.
+        :type file_name_of_multi_label_tiff: str | None
 
-        :param save_different_labels_in_different_tiff_files: If True, it saves the different predicted labels in
+        :param do_save_single_label_tiffs: If True, it saves the different predicted labels in
           different tiff files. One tiff file per label class. The default is False.
-        :type save_different_labels_in_different_tiff_files: bool
+        :type do_save_single_label_tiffs: bool
 
-        :param tiff_file_names_of_different_labels: The names of the tiffs files.
-        :type tiff_file_names_of_different_labels: str | list[str] | tuple[str] | None
+        :param file_name_of_single_label_tiffs: The names of the tiffs files.
+        :type file_name_of_single_label_tiffs: str | list[str] | tuple[str] | None
 
         :param dtype_labels: Optional numpy data type of the predicted labels. If it is None (Default), numpy will
           decide it (usually int64).
@@ -317,37 +289,58 @@ class Apply:
             raise TypeError('biases must be None, an int, a float, a list or a tuple')
 
         n_biases = len(biases)
+        for b in range(0, n_biases, 1):
+            if biases[b] is None:
+                biases[b] = 1.0
+            elif isinstance(biases[b], int):
+                biases[b] = float(biases[b])
+            elif isinstance(biases[b], float):
+                pass
+            else:
+                raise TypeError("biases[b] must be an int, a float or None")
 
+        probs = self.predict_probs(data=data)
+
+        labels = [None for b in range(0, n_biases, 1)]  # type: list
         candidates = [None for b in range(0, n_biases, 1)]  # type: list
+
         for b in range(0, n_biases, 1):
 
-            candidates[b] = self.single_image_single_bias(
-                zarr_path=zarr_path, bias=biases[b],
+            labels[b], candidates[b] = self.hough_detection(
+                probs=probs, voxel_size=data.voxel_size, bias=biases[b], dtype_labels=dtype_labels)
 
-                save_all_labels_in_one_tiff_file=save_all_labels_in_one_tiff_file,
+            self.save_labels(la)
+
+
+            candidates[b] = self.single_image_single_bias(
+                data=data, bias=biases[b],
+
+                save_all_labels_in_one_tiff_file=do_save_multi_label_tiff,
 
                 tiff_file_name_of_all_labels=(
                     None
-                    if (not save_all_labels_in_one_tiff_file) or (tiff_file_name_of_all_labels is None)
-                    else tiff_file_name_of_all_labels[b]),
+                    if (not do_save_multi_label_tiff) or (file_name_of_multi_label_tiff is None)
+                    else file_name_of_multi_label_tiff[b]),
 
-                save_different_labels_in_different_tiff_files=save_different_labels_in_different_tiff_files,
+                save_different_labels_in_different_tiff_files=do_save_single_label_tiffs,
 
                 tiff_file_names_of_different_labels=(
                     None
-                    if (not save_different_labels_in_different_tiff_files) or
-                       (tiff_file_names_of_different_labels is None)
-                    else tiff_file_names_of_different_labels[b]),
+                    if (not do_save_single_label_tiffs) or
+                       (file_name_of_single_label_tiffs is None)
+                    else file_name_of_single_label_tiffs[b]),
 
                 dtype_labels=dtype_labels, show=show)
 
         return candidates
 
-    def predict_probs(self, zarr_path):
+    def predict_probs(self, data):
+        """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using different biases.
 
+        :param data: The raw data to be predicted.
+        :type data: EMData
 
-        data = EMData(zarr_path, 'predict', clahe=TRAINING_CONFIG.clahe)
-
+        """
 
         # Check if there are multiple channels within the raw data.
         # This shouldn't be the case for us as EM data is 'colourblind'.
@@ -443,9 +436,67 @@ class Apply:
 
         return hough_pred, candidates
 
-    def save_predicted_labels_as_zarr(self, labels, zarr_path, raw_data_attrs, bias=None):
+    def save_labels(
+            self, labels, bias=None,
+            do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None, raw_data_attributs=None,
+            do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
+            do_save_single_label_tiffs=False,
+            file_name_of_single_label_tiffs=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
+
+        :param data: The raw data to be predicted.
+        :type data: EMData
+
+        :param bias: A factor biasing the labelling of vesicle candidates. It labels a candidate as PC- if
+          maxima_pos is less than bias * maxima_neg. Otherwise, it labels it as PC+. So, a bias greater than 1 favours
+          PC- labelling while a bias less than 1 favours PC+.
+        :type bias: int | float | None
+
+        :param do_save_multi_label_tiff: If True, it saves all predicted labels in one tiff file. The default is
+          False.
+        :type do_save_multi_label_tiff: bool
+
+        :param file_name_of_multi_label_tiff: The name of the tiff file.
+        :type file_name_of_multi_label_tiff: str | None
+
+        :param do_save_single_label_tiffs: If True, it saves the different predicted labels in
+          different tiff files. One tiff file per label class. The default is False.
+        :type do_save_single_label_tiffs: bool
+
+        :param file_name_of_single_label_tiffs: The names of the tiffs files.
+        :type file_name_of_single_label_tiffs: str | list[str] | tuple[str] | None
+
+        """
+
+        if do_save_multi_label_zarr:
+            self.save_multi_label_zarr()
+
+        if isinstance(do_save_multi_label_tiff, bool):
+
+            if do_save_multi_label_tiff:
+
+                self.save_multi_label_tiff()
+
+        else:
+            raise TypeError('do_save_multi_label_tiff must be a bool')
+
+        if isinstance(do_save_single_label_tiffs, bool):
+            if do_save_single_label_tiffs:
+
+                self.save_single_label_tiffs()
+
+        else:
+            raise TypeError('do_save_single_label_tiffs must be a bool')
+
+        return None
+
+    def save_multi_label_zarr(self, labels, zarr_path, raw_data_attrs, bias=None):
+
+        """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
+
+        :param labels: An Array containing the labels of an image.
+        :type labels: np.ndarray | torch.Tensor
 
         :param zarr_path: Path to the zarr group that contains the 'predict' zarr group within it. This path will be fed
           into the EMData class.
@@ -453,12 +504,8 @@ class Apply:
 
         :param raw_data_attrs: The attributes of the zarr container. They are stored in data.raw_data.attrs.
 
-        :param labels: An Array containing the labels of an image.
-        :type labels: np.ndarray | torch.Tensor
-
         :param bias: The bias used in the hough detection.
         :type bias: int | float | None
-
         """
 
         if isinstance(labels, np.ndarray):
@@ -471,6 +518,7 @@ class Apply:
         date = datetime.today().strftime('%Y-%m-%d')
 
         # Create save location
+        # todo: define the zarr path outside the function
 
         save_path = os.path.join(zarr_path, 'predict', 'Predictions')
 
@@ -494,36 +542,7 @@ class Apply:
 
         return None
 
-    def save_image_in_1_file(self, image, file_name):
-
-        """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
-
-        :param image: An Image-like Array.
-        :type image: np.ndarray | torch.Tensor
-
-        :param file_name: The name of the tiff file.
-        :type file_name: str | None
-        """
-
-        if isinstance(image, np.ndarray):
-            pass
-        elif isinstance(image, torch.Tensor):
-            image = image.detach().numpy()
-        else:
-            raise TypeError("image must be a numpy array or torch.Tensor")
-
-        if not isinstance(file_name, str):
-            raise TypeError('file_name must be a string')
-
-        dirname_tiff = os.path.dirname(file_name)
-        if len(dirname_tiff) > 0:
-            os.makedirs(dirname_tiff, exist_ok=True)
-
-        skimage.io.imsave(file_name, image)
-
-        return None
-
-    def save_all_labels_in_1_file(self, labels, file_name=None, bias=None):
+    def save_multi_label_tiff(self, labels, file_name=None, bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -567,7 +586,7 @@ class Apply:
 
         return None
 
-    def save_different_labels_in_different_files(self, labels, file_names=None, bias=None):
+    def save_single_label_tiffs(self, labels, file_names=None, bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -664,10 +683,12 @@ if __name__ == "__main__":
 
     apply = Apply(model_checkpoint=model_checkpoint, label_background=0)
 
+    data = EMData(data_path, 'predict', clahe=TRAINING_CONFIG.clahe)
+
     candidates = apply(
-        zarr_path=data_path, biases=biases,
-        save_all_labels_in_one_tiff_file=True, tiff_file_name_of_all_labels=None,
-        save_different_labels_in_different_tiff_files=True, tiff_file_names_of_different_labels=None,
+        data=data, biases=biases,
+        do_save_multi_label_tiff=True, file_name_of_multi_label_tiff=None,
+        do_save_single_label_tiffs=True, file_name_of_single_label_tiffs=None,
         dtype_labels='int8', show=show)
 
     for b in range(0, len(biases), 1):
