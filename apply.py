@@ -3,6 +3,7 @@ import os
 from datetime import datetime
 import numpy as np
 import skimage.io
+# import imageio
 import zarr
 import torch
 
@@ -11,7 +12,7 @@ from src.processing.predict import Prediction
 from src.model.model import DetectionModel
 from src.processing.post_processing.hough_detector import HoughDetector
 from src.directory_organisor import create_unique_directory_file
-from src.visualisation import show_prediction
+from src.visualisation import show_prediction, Viewer
 
 from config.load_configs import TRAINING_CONFIG
 
@@ -73,7 +74,7 @@ class Apply:
             save_all_labels_in_one_tiff_file=False, tiff_file_name_of_all_labels=None,
             save_different_labels_in_different_tiff_files=False,
             tiff_file_names_of_different_labels= None,
-            dtype_labels=None, show=False):
+            dtype_labels=None, do_show=False):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -103,8 +104,8 @@ class Apply:
           decide it (usually int64).
         :type dtype_labels: None | str | np.dtype
 
-        :param show: If True, it shows the predicted label on the raw image by napari. Default is False.
-        :type show: bool
+        :param do_show: If True, it shows the predicted label on the raw image by napari. Default is False.
+        :type do_show: bool
 
         """
 
@@ -149,8 +150,8 @@ class Apply:
         else:
             raise TypeError('save_different_labels_in_different_tiff_files must be a bool')
 
-        if not isinstance(show, bool):
-            raise TypeError('show must be a bool')
+        if not isinstance(do_show, bool):
+            raise TypeError('do_show must be a bool')
 
         probs = self.predict_probs(data=data)
 
@@ -192,7 +193,8 @@ class Apply:
             dirname_tiff = os.path.dirname(tiff_file_name_of_all_labels)
             if len(dirname_tiff) > 0:
                 os.makedirs(dirname_tiff, exist_ok=True)
-            skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred, plugin='tifffile', check_contrast=False)
+            skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred, check_contrast=False, plugin='tifffile')
+            # imageio.volsave(uri=tiff_file_name_of_all_labels, im=hough_pred, format="tifffile")
 
         # Save a tiff file per label class, excluding the background label
         if save_different_labels_in_different_tiff_files:
@@ -227,9 +229,10 @@ class Apply:
                     os.makedirs(dirname_tiff_l, exist_ok=True)
 
                 skimage.io.imsave(
-                    tiff_file_names_of_different_labels[l], hough_pred_l, plugin='tifffile', check_contrast=False)
+                    tiff_file_names_of_different_labels[l], hough_pred_l, check_contrast=False, plugin='tifffile')
+                # imageio.volsave(uri=tiff_file_names_of_different_labels[l], im=hough_pred_l, format="tifffile")
 
-        if show:
+        if do_show:
             show_prediction(data.numpy(), hough_pred)
 
         return candidates
@@ -240,7 +243,7 @@ class Apply:
             do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
             do_save_single_label_tiffs=False,
             file_name_of_single_label_tiffs=None,
-            dtype_labels=None, show=False):
+            dtype_labels=None, do_show=False):
 
         # TODO: DOC STRING NEEDS TO UPDATED
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using different biases.
@@ -271,8 +274,8 @@ class Apply:
           decide it (usually int64).
         :type dtype_labels: None | str | np.dtype
 
-        :param show: If True, it shows the predicted label on the raw image by napari. Default is False.
-        :type show: bool
+        :param do_show: If True, it shows the predicted label on the raw image by napari. Default is False.
+        :type do_show: bool
 
         """
 
@@ -305,23 +308,37 @@ class Apply:
 
         probs = self.predict_probs(data=data)
 
+        data_voxel_size = data.voxel_size
+        data_attrs = data.raw_data.attrs
+        data_zarr_path = data.zarr_path
+
+        if isinstance(do_show, bool):
+            if do_show:
+                viewer = Viewer(raw_image=data.numpy(), name='Raw Image', opacity=1.0)
+            else:
+                viewer = None
+        else:
+            raise TypeError('do_show must be a bool')
+
+        del data
+
         labels = [None for b in range(0, n_biases, 1)]  # type: list
         candidates = [None for b in range(0, n_biases, 1)]  # type: list
 
         for b in range(0, n_biases, 1):
 
             labels[b], candidates[b] = self.hough_detection(
-                probs=probs, voxel_size=data.voxel_size, bias=biases[b], dtype_labels=dtype_labels)
+                probs=probs, voxel_size=data_voxel_size, bias=biases[b], dtype_labels=dtype_labels)
 
             self.save_labels(
                 labels=labels[b],
 
                 do_save_multi_label_zarr=do_save_multi_label_zarr,
                 dirname_of_multi_label_zarr=(
-                    None if (not do_save_multi_label_zarr) or (dirname_of_multi_label_zarr is None)
+                    None if (not do_save_multi_label_zarr)
+                    else data_zarr_path if (dirname_of_multi_label_zarr is None)
                     else dirname_of_multi_label_zarr[b]),
-
-                raw_data_attrs=data.raw_data.attrs,
+                raw_data_attrs=data_attrs,
 
                 do_save_multi_label_tiff=do_save_multi_label_tiff,
                 file_name_of_multi_label_tiff=(
@@ -335,8 +352,11 @@ class Apply:
 
                 bias=biases[b])
 
-        if show:
-            show_prediction(data.numpy(), labels)
+            if do_show:
+                viewer.append_labels(labels=labels[b], name=f'labels_with_bias_{biases[b]:0.3f}', opacity=0.4)
+
+        if do_show:
+            viewer.show()
 
         return probs, labels, candidates
 
@@ -387,7 +407,7 @@ class Apply:
         :type probs: np.ndarray | torch.Tensor
 
         :param voxel_size: The voxel size of the image.
-        :type voxel_size: int | float
+        :type voxel_size: int | float | list[int | float] | tuple[int | float]
 
         :param bias: A factor biasing the labelling of vesicle candidates. It labels a candidate as PC- if
           maxima_pos is less than bias * maxima_neg. Otherwise, it labels it as PC+. So, a bias greater than 1 favours
@@ -409,8 +429,15 @@ class Apply:
 
         if isinstance(voxel_size, (int, float)):
             pass
+        elif issubclass(type(voxel_size), (list, tuple)):
+            n_sizes = len(voxel_size)
+            for s in range(0, n_sizes, 1):
+                if isinstance(voxel_size[s], (int, float)):
+                    pass
+                else:
+                    raise TypeError(f"voxel_size[{s:d}] must be an int or float")
         else:
-            raise TypeError("voxel_size must be a float or int")
+            raise TypeError("voxel_size must be an int, a float or sequence of ints or floats")
 
         if bias is None:
             bias = 1.0
@@ -523,7 +550,7 @@ class Apply:
 
         if bias is None:
             save_path = os.path.join(save_path, 'date_{date:s}'.format(date=date))
-        elif isinstance(bias, int):
+        elif isinstance(bias, (int, float)):
             save_path = os.path.join(save_path, 'bias_{bias:0.3f}_date_{date:s}'.format(bias=bias, date=date))
         else:
             raise TypeError('bias must be an int or None')
@@ -566,7 +593,7 @@ class Apply:
             dirname = os.path.join('predicted_labels', 'tiffs')
             if bias is None:
                 pass
-            elif isinstance(bias, int):
+            elif isinstance(bias, (int, float)):
                 dirname = os.path.join(dirname, 'bias_{bias:0.3f}'.format(bias=bias))
             else:
                 raise TypeError('bias must be an int or None')
@@ -581,7 +608,8 @@ class Apply:
         if len(dirname) > 0:
             os.makedirs(dirname, exist_ok=True)
 
-        skimage.io.imsave(file_name, labels, plugin='tifffile', check_contrast=False)
+        skimage.io.imsave(file_name, labels, check_contrast=False, plugin='tifffile')
+        # imageio.volsave(uri=file_name, im=labels, format="tifffile")
 
         return None
 
@@ -627,7 +655,7 @@ class Apply:
             dirname = os.path.join('predicted_labels', 'tiffs')
             if bias is None:
                 pass
-            elif isinstance(bias, int):
+            elif isinstance(bias, (int, float)):
                 dirname = os.path.join(dirname, 'bias_{bias:0.3f}'.format(bias=bias))
             else:
                 raise TypeError('bias must be an int or None')
@@ -653,7 +681,8 @@ class Apply:
             if len(dirname_tiff_l) > 0:
                 os.makedirs(dirname_tiff_l, exist_ok=True)
 
-            skimage.io.imsave(file_names[l], labels_l, plugin='tifffile', check_contrast=False)
+            skimage.io.imsave(file_names[l], labels_l, check_contrast=False, plugin='tifffile')
+            # imageio.volsave(uri=file_names[l], im=labels_l, format="tifffile")
 
         return None
 
@@ -674,9 +703,9 @@ if __name__ == "__main__":
         print("Invalid input. Please enter 'y' or 'n' only.")
         visualise = input("Would you like to visualise the prediction? (y/n): ")
     else:
-        show = visualise.lower() == 'y'
+        do_show = visualise.lower() == 'y'
 
-    biases = [5]
+    biases = [1, 5]
 
     print("-----")
 
@@ -684,11 +713,12 @@ if __name__ == "__main__":
 
     data = EMData(data_path, 'predict', clahe=TRAINING_CONFIG.clahe)
 
-    candidates = apply(
+    probs, labels, candidates = apply(
         data=data, biases=biases,
+        do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
         do_save_multi_label_tiff=True, file_name_of_multi_label_tiff=None,
         do_save_single_label_tiffs=True, file_name_of_single_label_tiffs=None,
-        dtype_labels='int8', show=show)
+        dtype_labels='int8', do_show=do_show)
 
     for b in range(0, len(biases), 1):
         pos_labels = 0
@@ -706,10 +736,11 @@ if __name__ == "__main__":
 
 
 # todo:
-# - update the visualiser to add multiple layers of labels
-# - define the zarr path outside the function
 # - update the doc stings of the functions
 # - format all input argument of the functions before use
+# - if main, parse input arguments
+# - define the zarr path outside the function
 
 # done
 # - force skimage.io.imsave to save labels as tiff
+# - update the visualiser to add multiple layers of labels
