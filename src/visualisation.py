@@ -1,7 +1,8 @@
 
+import sys
+import numpy as np
 import napari
 import zarr
-import sys
 
 
 def imshow_napari_validation(data_path, prediction_path):
@@ -88,19 +89,53 @@ def imshow_napari_prediction(data_path, prediction_path):
     napari.run()
 
 
-def show_prediction(raw_data, labels):
+def show_prediction(raw_image, labels):
 
 
     # Obtain difference between input shape and output shape, to allow alignment in napari
     padding = [
-        int((raw_data.shape[0] - labels.shape[0])/2),
-        int((raw_data.shape[1] - labels.shape[1])/2),
-        int((raw_data.shape[2] -labels.shape[2])/2)]
+        int((raw_image.shape[0] - labels.shape[0])/2),
+        int((raw_image.shape[1] - labels.shape[1])/2),
+        int((raw_image.shape[2] -labels.shape[2])/2)]
 
     viewer = napari.Viewer()
-    viewer.add_image(data=raw_data, name='Raw')
+    viewer.add_image(data=raw_image, name='Raw')
     viewer.add_image(data=labels, name='Hough Transformed', blending='additive', colormap='inferno', translate=padding)
     napari.run()
+
+
+class Viewer:
+
+    def __init__(self, raw_image=None, name='Raw', opacity=1.0):
+
+        self.viewer = napari.Viewer()
+
+        if raw_image is None:
+            pass
+
+        elif isinstance(raw_image, np.ndarray):
+
+            self.append_raw_image(raw_image=raw_image, name=name, opacity=opacity)
+
+        else:
+            raise TypeError('raw_image must be None or np.ndarray')
+
+    def append_raw_image(self, raw_image, name='Raw', opacity=1.0):
+
+        self.viewer.add_image(data=raw_image, name=name, opacity=opacity, visible=True)
+
+    def append_labels(self, labels, name='labels', opacity=0.4):
+
+        self.viewer.add_labels(data=labels, name=name, opacity=opacity, visible=True)
+
+    def show(self):
+
+        napari.run()
+
+        # self.viewer.show(block=False)
+
+        # self.viewer.show(block=True)
+
 
 if __name__ == "__main__":
 
