@@ -226,33 +226,16 @@ def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, sphe
         for points, vertices, faces, cid in hulls:
             print("Vertices coords range:", points.min(axis=0), points.max(axis=0))
             print("Faces shape:", faces.shape)
-            values = np.ones(points.shape[0]) * cid
-            # fig = plt.figure()
-            # ax = fig.add_subplot(111, projection='3d')
-            # # Plot all raw points
-            # ax.scatter(points[:, 0], points[:, 1], points[:, 2], color='blue', s=5, alpha=0.3)
-            # # Plot hull edges
-            # for simplex in faces:
-            #     simplex_points = points[simplex]
-            #     ax.plot(simplex_points[:, 0], simplex_points[:, 1], simplex_points[:, 2], 'k-')
-            # # Plot hull vertices in red
-            # hull_vertices = points[vertices]
-            # ax.scatter(hull_vertices[:, 0], hull_vertices[:, 1], hull_vertices[:, 2], color='red', s=20)
-            # ax.set_xlabel("X")
-            # ax.set_ylabel("Y")
-            # ax.set_zlabel("Z")
-            # plt.show()
-
             # 1. Extract unique vertices from hull.simplices
             unique_vertex_indices = np.unique(faces.flatten())
             vertices_coords = points[unique_vertex_indices]
             # 2. Remap simplices to new vertex indices
             index_map = {old_idx: new_idx for new_idx, old_idx in enumerate(unique_vertex_indices)}
             faces_remapped = np.array([[index_map[i] for i in face] for face in faces])
+            values = np.ones(vertices_coords.shape[0]) * cid
+            print(f"Adding surface for cluster {cid} with {vertices_coords} vertices and {faces_remapped} faces")
             viewer.add_surface((vertices_coords, faces_remapped, values),
-                            name=f'Cluster {cid}',
-                            colormap='viridis',
-                            opacity=0.5)
+                            name=f'Cluster {cid}')
 
     napari.run()
 
