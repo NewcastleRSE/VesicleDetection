@@ -233,9 +233,8 @@ def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, sphe
             index_map = {old_idx: new_idx for new_idx, old_idx in enumerate(unique_vertex_indices)}
             faces_remapped = np.array([[index_map[i] for i in face] for face in faces])
             values = np.ones(vertices_coords.shape[0]) * cid
-            print(f"Adding surface for cluster {cid} with {vertices_coords} vertices and {faces_remapped} faces")
             viewer.add_surface((vertices_coords, faces_remapped, values),
-                            name=f'Cluster {cid}')
+                            name=f'Cluster {cid}',)
 
     napari.run()
 
