@@ -7,6 +7,7 @@ import napari
 import zarr
 from napari.layers import Shapes
 from scipy.spatial import ConvexHull
+import trimesh
 
 # Helper functions ------------------------------
 
@@ -23,7 +24,6 @@ def calculate_cluster_hulls(locs, labels):
         except Exception as e:
             print(f"Skipping cluster {cid} due to ConvexHull error: {e}")
     return hulls
-
 
 def load_clusters(npz_path, downsample=1.0, cluster_ids=None, top_clusters=None):
     data = np.load(npz_path)
@@ -52,11 +52,11 @@ def load_clusters(npz_path, downsample=1.0, cluster_ids=None, top_clusters=None)
 
     # Limit to top clusters by number of points if requested
     if top_clusters is not None:
-        print(f"Limiting to top {top_clusters} clusters by size")
+        print(f"Limiting to top {top_clusters} clusters by size, out of {len(np.unique(labels))} total clusters")
         unique, counts = np.unique(labels, return_counts=True)
         sorted_clusters = unique[np.argsort(-counts)]
         allowed = set(sorted_clusters[:top_clusters])
-        mask = np.array([l in allowed for l in labels])
+        mask = np.array([label in allowed for label in labels])
         locs = locs[mask]
         labels = labels[mask]
 
@@ -85,38 +85,53 @@ def crop_volumes(raw_data, hough_data, locs, crop_min=None, crop_max=None):
     locs_crop = locs - min_coords
     return raw_crop, hough_crop, locs_crop
 
-def compute_cluster_spheres(locs, labels, cluster_ids=None):
-    print("computing spheres for clusters")
-    spheres = []
-    unique_labels = np.unique(labels)
-    if cluster_ids is not None:
-        unique_labels = [cid for cid in unique_labels if cid in cluster_ids]
 
-    for cid in unique_labels:
-        points = locs[labels == cid]
-        if len(points) == 0:
-            continue
-        center = points.mean(axis=0)
-        dists = np.linalg.norm(points - center, axis=1)
-        radius = dists.max()
-        spheres.append((center[0], center[1], center[2], radius, cid))
+def hull_to_mask(vertices, faces, shape, dilation=0):
+    """
+    Convert a convex hull mesh to a 3D binary mask.
 
-    return np.array(spheres)
+    Parameters
+    ----------
+    vertices : (N, 3) array
+        Coordinates of mesh vertices.
+    faces : (M, 3) array
+        Triangular faces (vertex indices).
+    shape : tuple
+        Shape of the output mask (z, y, x).
+    dilation : int
+        Optional dilation radius in voxels.
+
+    Returns
+    -------
+    mask : ndarray (bool)
+        Binary mask where True is inside the hull.
+    """
+    # Create trimesh object
+    mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
+
+    # Voxelise at resolution of image (pitch = 1 assumes vertices are in voxel coords)
+    vox = mesh.voxelized(pitch=1)
+    mask = vox.matrix.astype(bool)
+
+    # Place into image space (ensure correct shape)
+    img_mask = np.zeros(shape, dtype=bool)
+    min_corner = np.floor(mesh.bounds[0]).astype(int)
+    z, y, x = mask.shape
+    img_mask[
+        min_corner[0]:min_corner[0]+z,
+        min_corner[1]:min_corner[1]+y,
+        min_corner[2]:min_corner[2]+x
+    ] = mask
+
+    if dilation > 0:
+        from scipy.ndimage import binary_dilation
+        img_mask = binary_dilation(img_mask, iterations=dilation)
+
+    return img_mask
+
+
 
 # Plotting functions ------------------------------
-
-def plot_spheres_matplotlib(spheres, output=None):
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    for cx, cy, cz, r in spheres:
-        ax.scatter(cx, cy, cz, s=max(r*50, 1), alpha=0.5)  # size scales with radius
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-    if output:
-        plt.savefig(output)
-    else:
-        plt.show()
 
 def plot_points_matplotlib(locs, labels, output=None):
     fig = plt.figure()
@@ -133,19 +148,6 @@ def plot_points_matplotlib(locs, labels, output=None):
     else:
         plt.show()
 
-def plot_spheres_plotly(spheres, output=None):
-    fig = go.Figure()
-    for cx, cy, cz, r in spheres:
-        fig.add_trace(go.Scatter3d(
-            x=[cx], y=[cy], z=[cz],
-            mode='markers',
-            marker=dict(size=r*10, color='blue', opacity=0.5)
-        ))
-    fig.update_layout(scene=dict(aspectmode='data'))
-    if output:
-        fig.write_html(output)
-    else:
-        fig.show()
 
 def plot_points_plotly(locs, labels, output=None):
     fig = go.Figure()
@@ -163,7 +165,7 @@ def plot_points_plotly(locs, labels, output=None):
     else:
         fig.show()
 
-def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, spheres=None):
+def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, dilation=None):
     # Get a colormap with enough distinct colors
     unique_labels = np.unique(labels)
     print(f"Unique labels found: {len(unique_labels)}")
@@ -191,36 +193,13 @@ def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, sphe
             label_vol[points[:,0].astype(int), points[:,1].astype(int), points[:,2].astype(int)] = cid + 1
         viewer.add_labels(label_vol, name='Cluster volumes')
 
-    if napari_plot_types=='spheres' or isinstance(napari_plot_types, list) and 'spheres' in napari_plot_types:
-        if spheres is None:
-            print("No spheres data provided, skipping spheres plot")
-            return
-        shapes_data = []
-        edge_colors = []
-        face_colors = []
-        print(f"Plotting {len(spheres)} spheres with labels {unique_labels}")
+    if napari_plot_types=='mask' or isinstance(napari_plot_types, list) and 'mask' in napari_plot_types:    
+        use_mask = True
+    else:   
+        use_mask = False
 
-        for cx, cy, cz, r, label in spheres:
-            circle = np.array([
-                [cx + r*np.cos(t), cy + r*np.sin(t), cz]
-                for t in np.linspace(0, 2*np.pi, 30)
-            ])
-            shapes_data.append(circle)
-            print(f"Sphere at ({cx}, {cy}, {cz}) with radius {r} and label {label}")
-            face_colors.append(label_to_color[label])
-            print(f"Color for label {label}: {label_to_color[label]}")
-            edge_colors.append(label_to_color[label])
-
-        viewer.add_shapes(
-            shapes_data,
-            shape_type='polygon',
-            edge_color=edge_colors,
-            face_color="red",
-            opacity=0.5,
-            name='Cluster spheres'
-        )
-
-    if napari_plot_types=='shapes' or isinstance(napari_plot_types, list) and 'shapes' in napari_plot_types:
+    if napari_plot_types=='shapes' or use_mask or isinstance(napari_plot_types, list) and 'shapes' in napari_plot_types:
+        raw_masked = np.copy(raw_data)
         hulls = calculate_cluster_hulls(locs, labels)
         print(f"Plotting {len(hulls)} convex hulls")
         for points, vertices, faces, cid in hulls:
@@ -229,12 +208,21 @@ def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, sphe
             # 1. Extract unique vertices from hull.simplices
             unique_vertex_indices = np.unique(faces.flatten())
             vertices_coords = points[unique_vertex_indices]
+            if dilation is not None:
+                centroid = vertices_coords.mean(axis=0)
+                vertices_coords = centroid + dilation * (vertices_coords - centroid)
             # 2. Remap simplices to new vertex indices
             index_map = {old_idx: new_idx for new_idx, old_idx in enumerate(unique_vertex_indices)}
             faces_remapped = np.array([[index_map[i] for i in face] for face in faces])
             values = np.ones(vertices_coords.shape[0]) * cid
-            viewer.add_surface((vertices_coords, faces_remapped, values),
-                            name=f'Cluster {cid}',)
+            if isinstance(napari_plot_types, list) and 'shapes' in napari_plot_types:
+                viewer.add_surface((vertices_coords, faces_remapped, values),
+                                name=f'Cluster {cid}',)
+            if use_mask:
+                mask = hull_to_mask(points, faces, raw_data.shape, dilation=3)
+                raw_masked[mask] = 0
+        if use_mask:
+            viewer.add_image(raw_masked, name='Masked Clusters', opacity=0.5)
 
     napari.run()
 
@@ -248,12 +236,12 @@ def cluster_plotter():
     parser.add_argument('--downsample', type=int, default=1, help='Downsample factor for points')
     parser.add_argument('--top_clusters', type=int, default=None, help='Number of top clusters to show')
     parser.add_argument('--clusters', nargs='*', type=int, help='Specific cluster ids to plot')
-    parser.add_argument('--napari_plot', nargs='*', type=str, help='Choose napari plot type, either points, volume, spheres or shapes. Can have multiple options. e.g. --napari_plot points volume')
-    parser.add_argument('--spheres', action='store_true', help='Plot with whole cluster spheres view')
+    parser.add_argument('--napari_plot', nargs='*', type=str, help='Choose napari plot type, either points, volume, spheres, shapes or mask. Can have multiple options. e.g. --napari_plot points volume')
     parser.add_argument('--html', type=str, help='Path to save plotly HTML')
     parser.add_argument('--png', type=str, help='Path to save matplotlib PNG')
     parser.add_argument('--crop_coords', nargs='*', help='Pass cropping coordinates to enforce a crop of the data, in the form zmin,zmax,ymin,ymax,xmin,xmax. E.g. --crop_coords 10,20,30,40,50,60')   
-
+    parser.add_argument('--dilation', type=float, default=None, help='Dilation factor for shapes')
+    
     args = parser.parse_args()
 
     # Load files -----------------------------
@@ -292,31 +280,26 @@ def cluster_plotter():
                                                       crop_max=(zmax, ymax, xmax))
     else:
         raw_data, hough_data, locs = crop_volumes(raw_data, hough_data, locs)
-    
-
-    # Compute spheres if requested -----------------------------
-    spheres = compute_cluster_spheres(locs, labels) if args.spheres else None
 
     # Plotting -----------------------------
     if args.html:
-        if args.spheres:
-            plot_spheres_plotly(spheres, output=args.html)
-        else:
             plot_points_plotly(locs, labels, output=args.html)
     
     if args.png:
-        if args.spheres:
-            plot_spheres_matplotlib(spheres, output=args.png)
-        else:
             plot_points_matplotlib(locs, labels, output=args.png)
     
     if not args.prediction_path:
             args.prediction_path = None
 
+    if args.dilation:
+        dilation = args.dilation
+    else:
+        dilation = None
+
     if args.napari_plot:
         if raw_data is None:
             raise RuntimeError("Raw data is required for napari plotting")
-        napari_plot(raw_data, hough_data, locs, labels, args.napari_plot, spheres)
+        napari_plot(raw_data, hough_data, locs, labels, args.napari_plot, dilation)
 
 if __name__ == "__main__":
     cluster_plotter()

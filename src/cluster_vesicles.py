@@ -4,7 +4,7 @@ import zarr
 import sys
 import numpy as np
 
-def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz"):
+def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5, min_samples=100):
     """
     Cluster vesicles using DBSCAN and save the results.
     
@@ -37,7 +37,7 @@ def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz"):
     # locs = np.asarray(locs).T
     
     # ===== DBSCAN =====
-    clustering = DBSCAN(eps=10, min_samples=200).fit(locs) # eps 87, min samples 100
+    clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(locs) # eps 87, min samples 100
     labels = clustering.labels_
     
     # ===== Save coordinates + labels =====
@@ -47,13 +47,19 @@ def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz"):
 if __name__ == "__main__":
 
     if len(sys.argv) < 2:
-        print("Usage: python cluster_vesicles.py <prediction_path> [html_path] [clusters_path]")
+        print("Usage: python cluster_vesicles.py <prediction_path> [clusters_path] [eps] [min_samples]")
         sys.exit(1)
     prediction_path = sys.argv[1]
     if len(sys.argv)==3:
         clusters_path = sys.argv[2]
+    elif len(sys.argv) > 3:
+        clusters_path = sys.argv[2]+"eps"+str(sys.argv[3])+"ms"+str(sys.argv[4])+".npz"
+        eps = float(sys.argv[3])
+        min_samples = int(sys.argv[4])
     else:
-        clusters_path = "dbscan_clusters.npz"
+        clusters_path = "dbscan_clusters_eps5ms100.npz"
+        eps = 5
+        min_samples = 100
 
-    cluster_vesicles(prediction_path, clusters_path)
+    cluster_vesicles(prediction_path, clusters_path, eps, min_samples)
 
