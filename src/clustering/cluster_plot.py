@@ -8,6 +8,7 @@ import zarr
 from napari.layers import Shapes
 from scipy.spatial import ConvexHull
 import trimesh
+from tqdm import tqdm
 
 # Helper functions ------------------------------
 
@@ -110,7 +111,7 @@ def hull_to_mask(vertices, faces, shape, dilation=0):
     mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
 
     # Voxelise at resolution of image (pitch = 1 assumes vertices are in voxel coords)
-    vox = mesh.voxelized(pitch=1)
+    vox = mesh.voxelized(pitch=1).fill()
     mask = vox.matrix.astype(bool)
 
     # Place into image space (ensure correct shape)
@@ -129,6 +130,40 @@ def hull_to_mask(vertices, faces, shape, dilation=0):
 
     return img_mask
 
+def crop_around_mask(raw_data, mask, voxel_size_nm=(6,6,6), crop_size_um=2.0):
+    """
+    Crop a cube around the mask centroid with padding to ensure full mask coverage.
+
+    Returns raw crop, mask crop, and crop bounds.
+    """
+    crop_size_nm = crop_size_um * 1000
+    crop_size_voxels = [int(crop_size_nm / vs) for vs in voxel_size_nm]
+    half_crop = [s // 2 for s in crop_size_voxels]
+
+    # centroid of the mask
+    coords = np.argwhere(mask)
+    cz, cy, cx = coords.mean(axis=0).astype(int)
+
+    # initial bounding box
+    zmin, zmax = cz - half_crop[0], cz + half_crop[0]
+    ymin, ymax = cy - half_crop[1], cy + half_crop[1]
+    xmin, xmax = cx - half_crop[2], cx + half_crop[2]
+
+    # adjust to fully include mask
+    mzmin, mymin, mxmin = coords.min(axis=0)
+    mzmax, mymax, mxmax = coords.max(axis=0)
+    zmin = min(zmin, mzmin); zmax = max(zmax, mzmax)
+    ymin = min(ymin, mymin); ymax = max(ymax, mymax)
+    xmin = min(xmin, mxmin); xmax = max(xmax, mxmax)
+
+    # clip to data bounds
+    zmin, ymin, xmin = np.maximum([zmin, ymin, xmin], 0)
+    zmax, ymax, xmax = np.minimum([zmax, ymax, xmax], np.array(raw_data.shape))
+
+    cropped_raw = raw_data[zmin:zmax, ymin:ymax, xmin:xmax]
+    cropped_mask = mask[zmin:zmax, ymin:ymax, xmin:xmax]
+
+    return cropped_mask, cropped_raw
 
 
 # Plotting functions ------------------------------
@@ -165,7 +200,7 @@ def plot_points_plotly(locs, labels, output=None):
     else:
         fig.show()
 
-def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, dilation=None):
+def napari_plot(raw_data, hough_data, locs, labels, out_dir, napari_plot_types=None, dilation=None, create_crops=False):
     # Get a colormap with enough distinct colors
     unique_labels = np.unique(labels)
     print(f"Unique labels found: {len(unique_labels)}")
@@ -203,8 +238,7 @@ def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, dila
         hulls = calculate_cluster_hulls(locs, labels)
         print(f"Plotting {len(hulls)} convex hulls")
         for points, vertices, faces, cid in hulls:
-            print("Vertices coords range:", points.min(axis=0), points.max(axis=0))
-            print("Faces shape:", faces.shape)
+            print(f"Processing cluster {cid} with {len(points)} points and {len(faces)} faces")
             # 1. Extract unique vertices from hull.simplices
             unique_vertex_indices = np.unique(faces.flatten())
             vertices_coords = points[unique_vertex_indices]
@@ -221,9 +255,21 @@ def napari_plot(raw_data, hough_data, locs, labels, napari_plot_types=None, dila
             if use_mask:
                 mask = hull_to_mask(points, faces, raw_data.shape, dilation=3)
                 raw_masked[mask] = 0
+        for cid in hulls: # moving to ensure that all masks are created before any crops
+            if create_crops:
+                cropped_mask, cropped_raw = crop_around_mask(raw_masked, mask)
+                crop_name = f"{out_dir}/cluster_{cid}_crop"
+                root = zarr.open(crop_name, mode="w")
+                root.create_dataset("raw", data=cropped_raw, chunks=(32, 128, 128), overwrite=True)
+                root.create_dataset("mask", data=cropped_mask, chunks=(32, 128, 128), overwrite=True)
+                #viewer.add_image(cropped_raw, name=f'Raw Crop {cid}')
+                #viewer.add_image(cropped_mask.astype(np.float32), name=f'Mask Crop {cid}', opacity=0.5)
+                print(f"Saved cropped data for cluster {cid} to {crop_name}")
         if use_mask:
+            root = zarr.open(out_dir, mode="w")
+            root.create_dataset("masked_raw", data=raw_masked, chunks=(32, 128, 128), overwrite=True)
             viewer.add_image(raw_masked, name='Masked Clusters', opacity=0.5)
-
+   
     napari.run()
 
 
@@ -241,6 +287,7 @@ def cluster_plotter():
     parser.add_argument('--png', type=str, help='Path to save matplotlib PNG')
     parser.add_argument('--crop_coords', nargs='*', help='Pass cropping coordinates to enforce a crop of the data, in the form zmin,zmax,ymin,ymax,xmin,xmax. E.g. --crop_coords 10,20,30,40,50,60')   
     parser.add_argument('--dilation', type=float, default=None, help='Dilation factor for shapes')
+    parser.add_argument('--create_crops', action='store_true', help='If set, will create cropped volumes and save to masked_clusters in data_path')
     
     args = parser.parse_args()
 
@@ -255,6 +302,7 @@ def cluster_plotter():
     if args.data_path:
         f_data = zarr.open(args.data_path, mode='r')
         raw_data = f_data['raw'][:]
+        out_dir = f"{args.data_path}masked_clusters"
     else:
         raw_data = None
 
@@ -299,7 +347,7 @@ def cluster_plotter():
     if args.napari_plot:
         if raw_data is None:
             raise RuntimeError("Raw data is required for napari plotting")
-        napari_plot(raw_data, hough_data, locs, labels, args.napari_plot, dilation)
+        napari_plot(raw_data, hough_data, locs, labels, out_dir, args.napari_plot, dilation, create_crops=args.create_crops)
 
 if __name__ == "__main__":
     cluster_plotter()

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Ranges for parameters
-eps_values=(5 10 15 20)
-min_samples_values=(50 100 200)
+eps_values=(1 2 3 4 5)
+min_samples_values=(25 50 75)
 
 # Input data path
 data_path="/Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/Predictions/31_07_2025/Hough_transformed"
