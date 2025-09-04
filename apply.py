@@ -282,7 +282,7 @@ class Apply:
         # todo: check and format of the arguments
 
         if biases is None:
-            biases = 1.0
+            biases = [1.0]
         elif isinstance(biases, int):
             biases = [float(biases)]
         elif isinstance(biases, float):
@@ -736,10 +736,14 @@ if __name__ == "__main__":
 
 
 # todo:
-# - update the doc stings of the functions
-# - format all input argument of the functions before use
-# - if main, parse input arguments
+
 # - define the zarr path outside the function
+
+# - format all input arguments of the functions before use
+
+# - if main, parse input arguments
+# - update the doc stings of the functions
+
 
 # done
 # - force skimage.io.imsave to save labels as tiff
