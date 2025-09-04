@@ -1,4 +1,5 @@
 
+import argparse
 import os
 from datetime import datetime
 import numpy as np
@@ -18,16 +19,16 @@ from config.load_configs import TRAINING_CONFIG
 
 
 class Apply:
-    def __init__(self, model_checkpoint, label_background=0, n_label_classes=None):
+    def __init__(self, model_filename, label_background=0, n_label_classes=None):
         """
 
-        :param model_checkpoint: Path to the model that should be used for prediction.
-        :type model_checkpoint: str
+        :param model_filename: Path to the model that should be used for prediction.
+        :type model_filename: str
         :param label_background: The label value for the background pixels/voxels. Default is 0.
         :type label_background: int | None
         """
 
-        self.model_checkpoint = model_checkpoint
+        self.model_filename = model_filename
 
         if label_background is None:
             self.label_background = 0
@@ -109,133 +110,7 @@ class Apply:
 
         """
 
-        if bias is None:
-            bias = 1.0
-        elif isinstance(bias, int):
-            bias = float(bias)
-        elif isinstance(bias, float):
-            pass
-        else:
-            raise TypeError("bias must be an int, a float or None")
-
-        if isinstance(save_all_labels_in_one_tiff_file, bool):
-
-            if save_all_labels_in_one_tiff_file:
-
-                if tiff_file_name_of_all_labels is None:
-                    tiff_file_name_of_all_labels = os.path.join(
-                        'predicted_labels', 'tiffs', 'bias_{bias:0.3f}'.format(bias=bias), 'labels_all.tif')
-                elif not isinstance(tiff_file_name_of_all_labels, str):
-                    raise TypeError('tiff_file_name_of_all_labels must be a string or None')
-        else:
-            raise TypeError('save_all_labels_in_one_tiff_file must be a bool')
-
-        if isinstance(save_different_labels_in_different_tiff_files, bool):
-            if save_different_labels_in_different_tiff_files:
-
-                if tiff_file_names_of_different_labels is None:
-                    n_tiff_file_names_of_different_labels = None
-                elif isinstance(tiff_file_names_of_different_labels, str):
-                    tiff_file_names_of_different_labels = [tiff_file_names_of_different_labels]
-                    n_tiff_file_names_of_different_labels = 1
-                elif isinstance(tiff_file_names_of_different_labels, (list, tuple)):
-                    n_tiff_file_names_of_different_labels = len(tiff_file_names_of_different_labels)
-                    for i in range(0, n_tiff_file_names_of_different_labels, 1):
-                        if not isinstance(tiff_file_names_of_different_labels[i], str):
-                            raise TypeError('Each Element of tiff_file_names_of_different_labels must be a string')
-                else:
-                    raise TypeError('tiff_file_names_of_different_labels must be a None, string, list or tuple')
-            else:
-                n_tiff_file_names_of_different_labels = None
-        else:
-            raise TypeError('save_different_labels_in_different_tiff_files must be a bool')
-
-        if not isinstance(do_show, bool):
-            raise TypeError('do_show must be a bool')
-
-        probs = self.predict_probs(data=data)
-
-        pos_pred_data = probs[1,:,:,:]
-        neg_pred_data = probs[2,:,:,:]
-
-        # Post process with hough detector
-        hough_detection = HoughDetector(
-            pred_pos = pos_pred_data,
-            pred_neg = neg_pred_data,
-            voxel_size = data.voxel_size,
-            bias = bias)
-
-        hough_detection.process()
-        hough_pred = hough_detection.prediction_result
-
-        if dtype_labels is not None:
-            hough_pred = hough_pred.astype(dtype=dtype_labels)
-
-        candidates = hough_detection.accepted_candidates
-
-        date = datetime.today().strftime('%Y-%m-%d')
-
-        # Create save location
-        save_path = create_unique_directory_file(
-            data_path + '/predict/Predictions/bias_{bias:0.3f}_date_{date:s}'.format(bias=bias, date=date))
-
-        save_location = os.path.relpath(save_path, data_path + '/predict')
-
-        # Save the validation prediction in zarr dictionary.
-        f = zarr.open(data_path + '/predict', mode='r+')
-        f[save_location + '/Hough_transformed'] = hough_pred
-
-        for atr in data.raw_data.attrs:
-            f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
-
-        # Save a single tiff file with all label classes
-        if save_all_labels_in_one_tiff_file:
-            dirname_tiff = os.path.dirname(tiff_file_name_of_all_labels)
-            if len(dirname_tiff) > 0:
-                os.makedirs(dirname_tiff, exist_ok=True)
-            skimage.io.imsave(tiff_file_name_of_all_labels, hough_pred, check_contrast=False, plugin='tifffile')
-            # imageio.volsave(uri=tiff_file_name_of_all_labels, im=hough_pred, format="tifffile")
-
-        # Save a tiff file per label class, excluding the background label
-        if save_different_labels_in_different_tiff_files:
-
-            n_label_classes = probs.shape[0]
-            label_classes = [l for l in range(0, n_label_classes, 1)]
-
-            label_classes_no_bg = [l for l in range(0, n_label_classes, 1) if l != self.label_background]
-
-            n_label_classes_no_bg = len(label_classes_no_bg)
-
-            if tiff_file_names_of_different_labels is None:
-                dirname_bias = os.path.join('predicted_labels', 'tiffs', 'bias_{bias:0.3f}'.format(bias=bias))
-                tiff_file_names_of_different_labels = [os.path.join(
-                    dirname_bias, 'labels_{label:0>3d}.tif'.format(label=label_l))
-                    for label_l in label_classes_no_bg]
-                n_tiff_file_names_of_different_labels = len(tiff_file_names_of_different_labels)
-            elif n_tiff_file_names_of_different_labels == n_label_classes_no_bg:
-                pass
-            else:
-                raise TypeError(
-                    'tiff_file_names_of_different_labels must have the same number file names as the label classes '
-                    'predicted by the model, excluding the background label.')
-
-            for l in range(0, n_label_classes_no_bg, 1):
-
-                hough_pred_l = np.full(shape=hough_pred.shape, fill_value=self.label_background, dtype=hough_pred.dtype)
-                hough_pred_l[hough_pred == label_classes_no_bg[l]] = label_classes_no_bg[l]
-
-                dirname_tiff_l = os.path.dirname(tiff_file_names_of_different_labels[l])
-                if len(dirname_tiff_l) > 0:
-                    os.makedirs(dirname_tiff_l, exist_ok=True)
-
-                skimage.io.imsave(
-                    tiff_file_names_of_different_labels[l], hough_pred_l, check_contrast=False, plugin='tifffile')
-                # imageio.volsave(uri=tiff_file_names_of_different_labels[l], im=hough_pred_l, format="tifffile")
-
-        if do_show:
-            show_prediction(data.numpy(), hough_pred)
-
-        return candidates
+        return None
 
     def predict_labels(
             self, data, biases=1.0,
@@ -385,7 +260,7 @@ class Apply:
             data = data,
             model = detection_model,
             input_shape = TRAINING_CONFIG.input_shape,
-            checkpoint = self.model_checkpoint)
+            checkpoint = self.model_filename)
 
         # Display the border of the output predicition compared to input shape
         #predictor.print_border_message()
@@ -687,38 +562,58 @@ class Apply:
         return None
 
 if __name__ == "__main__":
-        
-    data_path = input("Provide path to zarr container: ")
+
+    parser = argparse.ArgumentParser(
+        prog=None, usage=None, description=None, epilog=None, parents=[],
+        formatter_class=argparse.HelpFormatter, prefix_chars='-', fromfile_prefix_chars=None,
+        argument_default=None, conflict_handler='error', add_help=True, allow_abbrev=True,
+        exit_on_error=True)
+
+    parser.add_argument(
+        'data_dirname', action='store', type=str, help='The directory path of the zarr data.')
+
+    parser.add_argument(
+        'model_filename', action='store', type=str, help='The file path of the trained model.')
+
+    parser.add_argument(
+        '-v', '--visualise', action='store_true', type=bool, required=False,
+        help='If either "-v" or "--visualise" are in the arguments, visualise the predicted results.')
+
+    args = parser.parse_args()
+
+    args.data_dirname
+    args.model_filename
+    args.visualise
+
+    # data_dirname = input("Provide path to zarr container: ")
+    # print("-----")
+    # model_filename = input("Provide the path to the model checkpoint: ")
+    # print("-----")
+    # visualise = input("Would you like to visualise the prediction? (y/n): ")
+    #
+    # while visualise.lower() != 'y' and visualise.lower() != 'n':
+    #     print("-----")
+    #     print("Invalid input. Please enter 'y' or 'n' only.")
+    #     visualise = input("Would you like to visualise the prediction? (y/n): ")
+    # else:
+    #     do_show = visualise.lower() == 'y'
 
     print("-----")
-
-    model_checkpoint = input("Provide the path to the model checkpoint: ")
-
-    print("-----")
-
-    visualise = input("Would you like to visualise the prediction? (y/n): ")
-
-    while visualise.lower() != 'y' and visualise.lower() != 'n':
-        print("-----")
-        print("Invalid input. Please enter 'y' or 'n' only.")
-        visualise = input("Would you like to visualise the prediction? (y/n): ")
-    else:
-        do_show = visualise.lower() == 'y'
 
     biases = [1, 5]
 
-    print("-----")
 
-    apply = Apply(model_checkpoint=model_checkpoint, label_background=0)
 
-    data = EMData(data_path, 'predict', clahe=TRAINING_CONFIG.clahe)
+    apply = Apply(model_filename=args.model_filename, label_background=0)
+
+    data = EMData(args.data_dirname, 'predict', clahe=TRAINING_CONFIG.clahe)
 
     probs, labels, candidates = apply(
         data=data, biases=biases,
         do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
         do_save_multi_label_tiff=True, file_name_of_multi_label_tiff=None,
         do_save_single_label_tiffs=True, file_name_of_single_label_tiffs=None,
-        dtype_labels='int8', do_show=do_show)
+        dtype_labels='int8', do_show=args.visualise)
 
     for b in range(0, len(biases), 1):
         pos_labels = 0
@@ -737,11 +632,13 @@ if __name__ == "__main__":
 
 # todo:
 
+# - if main, parse input arguments
+
 # - define the zarr path outside the function
 
 # - format all input arguments of the functions before use
 
-# - if main, parse input arguments
+
 # - update the doc stings of the functions
 
 
