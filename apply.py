@@ -2,6 +2,7 @@
 import argparse
 import os
 from datetime import datetime
+import json
 import numpy as np
 import skimage.io
 # import imageio
@@ -113,7 +114,7 @@ class Apply:
         return None
 
     def predict_labels(
-            self, data, biases=1.0,
+            self, data, bias=1.0,
             do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
             do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
             do_save_single_label_tiffs=False,
@@ -121,15 +122,15 @@ class Apply:
             dtype_labels=None, do_show=False):
 
         # TODO: DOC STRING NEEDS TO UPDATED
-        """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using different biases.
+        """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using different bias.
 
         :param data: The raw data to be predicted.
         :type data: EMData
 
-        :param biases: A list of factors biasing the labelling of vesicle candidates. It labels a candidate as PC- if
-          maxima_pos is less than biases[b] * maxima_neg. Otherwise, it labels it as PC+. So, biases greater than 1
-          favour PC- labelling while biases less than 1 favour PC+.
-        :type biases: int | float | list | tuple | None
+        :param bias: A list of factors biasing the labelling of vesicle candidates. It labels a candidate as PC- if
+          maxima_pos is less than bias[b] * maxima_neg. Otherwise, it labels it as PC+. So, bias greater than 1
+          favour PC- labelling while bias less than 1 favour PC+.
+        :type bias: int | float | list | tuple | None
 
         :param do_save_multi_label_tiff: If True, it saves all predicted labels in one tiff file. The default
           is False.
@@ -156,30 +157,30 @@ class Apply:
 
         # todo: check and format of the arguments
 
-        if biases is None:
-            biases = [1.0]
-        elif isinstance(biases, int):
-            biases = [float(biases)]
-        elif isinstance(biases, float):
-            biases = [biases]
+        if bias is None:
+            bias = [1.0]
+        elif isinstance(bias, int):
+            bias = [float(bias)]
+        elif isinstance(bias, float):
+            bias = [bias]
 
-        elif isinstance(biases, list):
+        elif isinstance(bias, list):
             pass
-        elif isinstance(biases, tuple):
-            biases = list(biases)
+        elif isinstance(bias, tuple):
+            bias = list(bias)
         else:
-            raise TypeError('biases must be None, an int, a float, a list or a tuple')
+            raise TypeError('bias must be None, an int, a float, a list or a tuple')
 
-        n_biases = len(biases)
+        n_biases = len(bias)
         for b in range(0, n_biases, 1):
-            if biases[b] is None:
-                biases[b] = 1.0
-            elif isinstance(biases[b], int):
-                biases[b] = float(biases[b])
-            elif isinstance(biases[b], float):
+            if bias[b] is None:
+                bias[b] = 1.0
+            elif isinstance(bias[b], int):
+                bias[b] = float(bias[b])
+            elif isinstance(bias[b], float):
                 pass
             else:
-                raise TypeError("biases[b] must be an int, a float or None")
+                raise TypeError("bias[b] must be an int, a float or None")
 
         probs = self.predict_probs(data=data)
 
@@ -203,7 +204,7 @@ class Apply:
         for b in range(0, n_biases, 1):
 
             labels[b], candidates[b] = self.hough_detection(
-                probs=probs, voxel_size=data_voxel_size, bias=biases[b], dtype_labels=dtype_labels)
+                probs=probs, voxel_size=data_voxel_size, bias=bias[b], dtype_labels=dtype_labels)
 
             self.save_labels(
                 labels=labels[b],
@@ -225,10 +226,10 @@ class Apply:
                     None if (not do_save_single_label_tiffs) or (file_name_of_single_label_tiffs is None)
                     else file_name_of_single_label_tiffs[b]),
 
-                bias=biases[b])
+                bias=bias[b])
 
             if do_show:
-                viewer.append_labels(labels=labels[b], name=f'labels_with_bias_{biases[b]:0.3f}', opacity=0.4)
+                viewer.append_labels(labels=labels[b], name=f'labels_with_bias_{bias[b]:0.3f}', opacity=0.4)
 
         if do_show:
             viewer.show()
@@ -579,11 +580,27 @@ if __name__ == "__main__":
         '-v', '--visualise', action='store_true', type=bool, required=False,
         help='If either "-v" or "--visualise" are in the arguments, visualise the predicted results.')
 
+
+    parser.add_argument(
+        '-b', '--bias', action='store', default=None, type=str, required=False,
+        help=(
+            'A factor biasing the labelling of vesicle candidates.\n'
+            'A vesicle candidate is labelled as PC- if maxima_pos is less than bias * maxima_neg. Otherwise, it is\n'
+            'labelled as PC+. So, a bias greater than 1 favours PC- labelling while a bias less than 1 favours PC+.\n'
+            'The bias can either be an int, a float or a list of ints and floats in the form:\n'
+            '  [bias_1, bias_2, ..., bias_n]\n'
+            'For instance, it could be:\n'
+            '  [1, 1.5, 2]')
+    )
+
+
     args = parser.parse_args()
 
     args.data_dirname
     args.model_filename
     args.visualise
+
+    args.bias = json.loads(args.bias)
 
     # data_dirname = input("Provide path to zarr container: ")
     # print("-----")
@@ -600,8 +617,6 @@ if __name__ == "__main__":
 
     print("-----")
 
-    biases = [1, 5]
-
 
 
     apply = Apply(model_filename=args.model_filename, label_background=0)
@@ -609,13 +624,13 @@ if __name__ == "__main__":
     data = EMData(args.data_dirname, 'predict', clahe=TRAINING_CONFIG.clahe)
 
     probs, labels, candidates = apply(
-        data=data, biases=biases,
+        data=data, bias=args.bias,
         do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
         do_save_multi_label_tiff=True, file_name_of_multi_label_tiff=None,
         do_save_single_label_tiffs=True, file_name_of_single_label_tiffs=None,
         dtype_labels='int8', do_show=args.visualise)
 
-    for b in range(0, len(biases), 1):
+    for b in range(0, len(args.bias), 1):
         pos_labels = 0
         neg_labels = 0
         for candidate in candidates[b]:
@@ -625,7 +640,7 @@ if __name__ == "__main__":
                 neg_labels +=1 
 
         print('    '.join([
-            f"bias: {biases[b]:0.3f}",
+            f"bias: {args.bias[b]:0.3f}",
             f"PC+ predictions: {pos_labels: >9d}",
             f"PC- predictions: {neg_labels: >9d}"]))
 
@@ -634,12 +649,11 @@ if __name__ == "__main__":
 
 # - if main, parse input arguments
 
-# - define the zarr path outside the function
+# - update the doc stings of the functions
 
 # - format all input arguments of the functions before use
 
-
-# - update the doc stings of the functions
+# - define the zarr path outside the function
 
 
 # done
