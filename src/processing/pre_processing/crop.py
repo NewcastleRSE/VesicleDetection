@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         '-c', '--dim_channel', action='store', default=None, type=int, required=False,
-        help='The channel dimension of the Image to crop. If None (default), the image is considered to have no channel dimensions.)')
+        help='The channel dimension of the Image to crop. If None (default), the image is considered to have no channel dimensions.')
 
     args = parser.parse_args()
 
