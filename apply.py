@@ -20,16 +20,16 @@ from config.load_configs import TRAINING_CONFIG
 
 
 class Apply:
-    def __init__(self, model_filename, label_background=0, n_label_classes=None):
+    def __init__(self, filename_model, label_background=0, n_label_classes=None):
         """
 
-        :param model_filename: Path to the model that should be used for prediction.
-        :type model_filename: str
+        :param filename_model: Path to the model that should be used for prediction.
+        :type filename_model: str
         :param label_background: The label value for the background pixels/voxels. Default is 0.
         :type label_background: int | None
         """
 
-        self.model_filename = model_filename
+        self.filename_model = filename_model
 
         if label_background is None:
             self.label_background = 0
@@ -261,7 +261,7 @@ class Apply:
             data = data,
             model = detection_model,
             input_shape = TRAINING_CONFIG.input_shape,
-            checkpoint = self.model_filename)
+            checkpoint = self.filename_model)
 
         # Display the border of the output predicition compared to input shape
         #predictor.print_border_message()
@@ -571,10 +571,10 @@ if __name__ == "__main__":
         exit_on_error=True)
 
     parser.add_argument(
-        'data_dirname', action='store', type=str, help='The directory path of the zarr raw data.')
+        'dirname_data', action='store', type=str, help='The directory path of the zarr raw data.')
 
     parser.add_argument(
-        'model_filename', action='store', type=str, help='The file path of the trained model.')
+        'filename_model', action='store', type=str, help='The file path of the trained model.')
 
     parser.add_argument(
         '-b', '--background', action='store', default=0, type=int, required=False,
@@ -583,17 +583,15 @@ if __name__ == "__main__":
     parser.add_argument(
         '-B', '--bias', action='store', default=1.0, type=str, required=False,
         help=(
-            'A factor biasing the labelling of vesicle candidates.\n'
-            'A vesicle candidate is labelled as PC- if maxima_pos is less than bias * maxima_neg. Otherwise, it is\n'
-            'labelled as PC+. So, a bias greater than 1 favours PC- labelling while a bias less than 1 favours PC+.\n'
-            'The bias can either be an int, a float or a list of ints and floats in the form:\n'
-            '  [bias_1, bias_2, ..., bias_n]\n'
-            'For instance, it could be:\n'
-            '  [1, 1.5, 2]')
+            'A factor biasing the labelling of vesicle candidates. '
+            'A vesicle candidate is labelled as PC- if maxima_pos is less than bias * maxima_neg. Otherwise, it is '
+            'labelled as PC+. So, a bias greater than 1 favours PC- labelling while a bias less than 1 favours PC+. '
+            'The bias can either be an int, a float or a list of ints and floats in the form '
+            '"[bias_1, bias_2, ..., bias_n]". For instance, it could be "3", "3.752" or "[2, 3.174, 4.7]".')
     )
 
     parser.add_argument(
-        '-z', '--save_multi_label_zarr', action='store_true', type=bool, required=False,
+        '-z', '--save_multi_label_zarr', action='store_true', required=False,
         help='If in the arguments, save all labels in one zarr container.')
 
     parser.add_argument(
@@ -601,7 +599,7 @@ if __name__ == "__main__":
         help='The directory path of the multi-label zarr container.')
 
     parser.add_argument(
-        '-m', '--save_multi_label_tiff', action='store_true', type=bool, required=False,
+        '-m', '--save_multi_label_tiff', action='store_true', required=False,
         help='If in the arguments, save all labels in one tiff file.')
 
     parser.add_argument(
@@ -610,14 +608,14 @@ if __name__ == "__main__":
 
 
     parser.add_argument(
-        '-s', '--save_single_label_tiffs', action='store_true', type=bool, required=False,
+        '-s', '--save_single_label_tiffs', action='store_true', required=False,
         help='If in the arguments, save different labels in different tiff files.')
 
     parser.add_argument(
         '-S', '--filenames_of_single_label_tiffs', action='store', default=None, type=str,
         help=(
-            'The file paths of the single-label tiff file. Use the following format:\n'
-            '  ["filename_0", "filename_1", ..., "filename_n"]')
+            r'The file paths of the single-label tiff files with format '
+            r'"[\"filename_0\", \"filename_1\", ..., \"filename_n\"]".')
     )
 
     parser.add_argument(
@@ -625,13 +623,15 @@ if __name__ == "__main__":
         help='The numpy array data type of the labels. It accepts "int8", "int16", "int32" and "int64".')
 
     parser.add_argument(
-        '-v', '--visualise', action='store_true', type=bool, required=False,
+        '-v', '--visualise', action='store_true', required=False,
         help='If in the arguments, visualise the predicted results.')
+
+
 
     args = parser.parse_args()
 
-    args.data_dirname
-    args.model_filename
+    args.dirname_data
+    args.filename_model
     args.background
     args.bias
     args.save_multi_label_zarr
@@ -640,14 +640,14 @@ if __name__ == "__main__":
     args.filename_of_multi_label_tiff
     args.save_single_label_tiffs
     args.filenames_of_single_label_tiffs
-    args.dtype_labels
+    args.dtype
     args.visualise
 
     args.bias = json.loads(args.bias)
 
-    apply = Apply(model_filename=args.model_filename, label_background=args.background)
+    apply = Apply(filename_model=args.filename_model, label_background=args.background)
 
-    data = EMData(args.data_dirname, 'predict', clahe=TRAINING_CONFIG.clahe)
+    data = EMData(args.dirname_data, 'predict', clahe=TRAINING_CONFIG.clahe)
 
     probs, labels, candidates = apply(
         data=data, bias=args.bias,
@@ -657,7 +657,7 @@ if __name__ == "__main__":
         filename_of_multi_label_tiff=args.filename_of_multi_label_tiff,
         do_save_single_label_tiffs=args.save_single_label_tiffs,
         filenames_of_single_label_tiffs=args.filenames_of_single_label_tiffs,
-        dtype_labels=args.dtype_labels, do_show=args.visualise)
+        dtype_labels=args.dtype, do_show=args.visualise)
 
     for b in range(0, len(args.bias), 1):
         pos_labels = 0
