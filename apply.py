@@ -73,9 +73,9 @@ class Apply:
 
     def single_image_single_bias(
             self, data, bias=1.0,
-            save_all_labels_in_one_tiff_file=False, tiff_file_name_of_all_labels=None,
+            save_all_labels_in_one_tiff_file=False, tiff_filename_of_all_labels=None,
             save_different_labels_in_different_tiff_files=False,
-            tiff_file_names_of_different_labels= None,
+            tiff_filenames_of_different_labels= None,
             dtype_labels=None, do_show=False):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
@@ -92,15 +92,15 @@ class Apply:
           False.
         :type save_all_labels_in_one_tiff_file: bool
 
-        :param tiff_file_name_of_all_labels: The name of the tiff file.
-        :type tiff_file_name_of_all_labels: str | None
+        :param tiff_filename_of_all_labels: The name of the tiff file.
+        :type tiff_filename_of_all_labels: str | None
 
         :param save_different_labels_in_different_tiff_files: If True, it saves the different predicted labels in
           different tiff files. One tiff file per label class. The default is False.
         :type save_different_labels_in_different_tiff_files: bool
 
-        :param tiff_file_names_of_different_labels: The names of the tiffs files.
-        :type tiff_file_names_of_different_labels: str | list[str] | tuple[str] | None
+        :param tiff_filenames_of_different_labels: The names of the tiffs files.
+        :type tiff_filenames_of_different_labels: str | list[str] | tuple[str] | None
 
         :param dtype_labels: Optional numpy data type of the predicted labels. If it is None (Default), numpy will
           decide it (usually int64).
@@ -116,9 +116,9 @@ class Apply:
     def predict_labels(
             self, data, bias=1.0,
             do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
-            do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
+            do_save_multi_label_tiff=False, filename_of_multi_label_tiff=None,
             do_save_single_label_tiffs=False,
-            file_name_of_single_label_tiffs=None,
+            filenames_of_single_label_tiffs=None,
             dtype_labels=None, do_show=False):
 
         # TODO: DOC STRING NEEDS TO UPDATED
@@ -136,15 +136,15 @@ class Apply:
           is False.
         :type do_save_multi_label_tiff: bool
 
-        :param file_name_of_multi_label_tiff: The name of the tiff file.
-        :type file_name_of_multi_label_tiff: list[str] | tuple[str] | None
+        :param filename_of_multi_label_tiff: The name of the tiff file.
+        :type filename_of_multi_label_tiff: list[str] | tuple[str] | None
 
         :param do_save_single_label_tiffs: If True, it saves the different predicted labels in
           different tiff files. One tiff file per label class. The default is False.
         :type do_save_single_label_tiffs: bool
 
-        :param file_name_of_single_label_tiffs: The names of the tiffs files.
-        :type file_name_of_single_label_tiffs: list[list[str]] | tuple[tuple[str]] | None
+        :param filenames_of_single_label_tiffs: The names of the tiffs files.
+        :type filenames_of_single_label_tiffs: list[list[str]] | tuple[tuple[str]] | None
 
         :param dtype_labels: Optional numpy data type of the predicted labels. If it is None (Default), numpy will
           decide it (usually int64).
@@ -217,14 +217,14 @@ class Apply:
                 raw_data_attrs=data_attrs,
 
                 do_save_multi_label_tiff=do_save_multi_label_tiff,
-                file_name_of_multi_label_tiff=(
-                    None if (not do_save_multi_label_tiff) or (file_name_of_multi_label_tiff is None)
-                    else file_name_of_multi_label_tiff[b]),
+                filename_of_multi_label_tiff=(
+                    None if (not do_save_multi_label_tiff) or (filename_of_multi_label_tiff is None)
+                    else filename_of_multi_label_tiff[b]),
 
                 do_save_single_label_tiffs=do_save_single_label_tiffs,
-                file_name_of_single_label_tiffs=(
-                    None if (not do_save_single_label_tiffs) or (file_name_of_single_label_tiffs is None)
-                    else file_name_of_single_label_tiffs[b]),
+                filenames_of_single_label_tiffs=(
+                    None if (not do_save_single_label_tiffs) or (filenames_of_single_label_tiffs is None)
+                    else filenames_of_single_label_tiffs[b]),
 
                 bias=bias[b])
 
@@ -348,8 +348,8 @@ class Apply:
     def save_labels(
             self, labels,
             do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None, raw_data_attrs=None,
-            do_save_multi_label_tiff=False, file_name_of_multi_label_tiff=None,
-            do_save_single_label_tiffs=False, file_name_of_single_label_tiffs=None,
+            do_save_multi_label_tiff=False, filename_of_multi_label_tiff=None,
+            do_save_single_label_tiffs=False, filenames_of_single_label_tiffs=None,
             bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
@@ -361,15 +361,15 @@ class Apply:
           False.
         :type do_save_multi_label_tiff: bool
 
-        :param file_name_of_multi_label_tiff: The name of the tiff file.
-        :type file_name_of_multi_label_tiff: str | None
+        :param filename_of_multi_label_tiff: The name of the tiff file.
+        :type filename_of_multi_label_tiff: str | None
 
         :param do_save_single_label_tiffs: If True, it saves the different predicted labels in
           different tiff files. One tiff file per label class. The default is False.
         :type do_save_single_label_tiffs: bool
 
-        :param file_name_of_single_label_tiffs: The names of the tiffs files.
-        :type file_name_of_single_label_tiffs: str | list[str] | tuple[str] | None
+        :param filenames_of_single_label_tiffs: The names of the tiffs files.
+        :type filenames_of_single_label_tiffs: str | list[str] | tuple[str] | None
 
         :param bias: The bias used in the hough detection.
         :type bias: int | float | None
@@ -382,13 +382,13 @@ class Apply:
 
         if isinstance(do_save_multi_label_tiff, bool):
             if do_save_multi_label_tiff:
-                self.save_multi_label_tiff(labels=labels, file_name=file_name_of_multi_label_tiff, bias=bias)
+                self.save_multi_label_tiff(labels=labels, filename=filename_of_multi_label_tiff, bias=bias)
         else:
             raise TypeError('do_save_multi_label_tiff must be a bool')
 
         if isinstance(do_save_single_label_tiffs, bool):
             if do_save_single_label_tiffs:
-                self.save_single_label_tiffs(labels=labels, file_names=file_name_of_single_label_tiffs, bias=bias)
+                self.save_single_label_tiffs(labels=labels, filenames=filenames_of_single_label_tiffs, bias=bias)
         else:
             raise TypeError('do_save_single_label_tiffs must be a bool')
 
@@ -444,15 +444,15 @@ class Apply:
 
         return None
 
-    def save_multi_label_tiff(self, labels, file_name=None, bias=None):
+    def save_multi_label_tiff(self, labels, filename=None, bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
         :param labels: An Array containing the labels of the raw image.
         :type labels: np.ndarray | torch.Tensor
 
-        :param file_name: The names of the files.
-        :type file_name: str | None
+        :param filename: The names of the files.
+        :type filename: str | None
 
         :param bias: The bias used in the hough detection.
         :type bias: int | float | None
@@ -465,7 +465,7 @@ class Apply:
         else:
             raise TypeError("labels must be a numpy array or torch.Tensor")
 
-        if file_name is None:
+        if filename is None:
             dirname = os.path.join('predicted_labels', 'tiffs')
             if bias is None:
                 pass
@@ -474,30 +474,30 @@ class Apply:
             else:
                 raise TypeError('bias must be an int or None')
 
-            file_name = os.path.join(dirname, 'labels_all.tif')
+            filename = os.path.join(dirname, 'labels_all.tif')
 
-        elif isinstance(file_name, str):
-            dirname = os.path.dirname(file_name)
+        elif isinstance(filename, str):
+            dirname = os.path.dirname(filename)
         else:
-            raise TypeError('file_name must be a string or None')
+            raise TypeError('filename must be a string or None')
 
         if len(dirname) > 0:
             os.makedirs(dirname, exist_ok=True)
 
-        skimage.io.imsave(file_name, labels, check_contrast=False, plugin='tifffile')
-        # imageio.volsave(uri=file_name, im=labels, format="tifffile")
+        skimage.io.imsave(filename, labels, check_contrast=False, plugin='tifffile')
+        # imageio.volsave(uri=filename, im=labels, format="tifffile")
 
         return None
 
-    def save_single_label_tiffs(self, labels, file_names=None, bias=None):
+    def save_single_label_tiffs(self, labels, filenames=None, bias=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
         :param labels: An Array containing the labels of the raw image.
         :type labels: np.ndarray | torch.Tensor
 
-        :param file_names: The names of the files.
-        :type file_names: str | list[str] | tuple[str] | None
+        :param filenames: The names of the files.
+        :type filenames: str | list[str] | tuple[str] | None
 
         :param bias: The bias used in the hough detection.
         :type bias: int | float | None
@@ -510,23 +510,23 @@ class Apply:
         else:
             raise TypeError("labels must be a numpy array or torch.Tensor")
 
-        if file_names is None:
-            n_file_names = None
-        elif isinstance(file_names, str):
-            file_names = [file_names]
-            n_file_names = 1
-        elif isinstance(file_names, (list, tuple)):
-            n_file_names = len(file_names)
-            for i in range(0, n_file_names, 1):
-                if not isinstance(file_names[i], str):
-                    raise TypeError('Each Element of file_names must be a string')
+        if filenames is None:
+            n_filenames = None
+        elif isinstance(filenames, str):
+            filenames = [filenames]
+            n_filenames = 1
+        elif isinstance(filenames, (list, tuple)):
+            n_filenames = len(filenames)
+            for i in range(0, n_filenames, 1):
+                if not isinstance(filenames[i], str):
+                    raise TypeError('Each Element of filenames must be a string')
         else:
-            raise TypeError('file_names must be a None, string, list or tuple')
+            raise TypeError('filenames must be a None, string, list or tuple')
 
 
         # Save a tiff file per label class, excluding the background label
 
-        if file_names is None:
+        if filenames is None:
 
             dirname = os.path.join('predicted_labels', 'tiffs')
             if bias is None:
@@ -536,16 +536,16 @@ class Apply:
             else:
                 raise TypeError('bias must be an int or None')
 
-            file_names = [
+            filenames = [
                 os.path.join(dirname, 'labels_{label:0>3d}.tif'.format(label=label_l))
                 for label_l in self.label_classes_no_bg
             ]
-            n_file_names = len(file_names)
-        elif n_file_names == self.n_label_classes_no_bg:
+            n_filenames = len(filenames)
+        elif n_filenames == self.n_label_classes_no_bg:
             pass
         else:
             raise TypeError(
-                'file_names must have the same number file names as the label classes '
+                'filenames must have the same number file names as the label classes '
                 'predicted by the model, excluding the background label.')
 
         for l in range(0, self.n_label_classes_no_bg, 1):
@@ -553,12 +553,12 @@ class Apply:
             labels_l = np.full(shape=labels.shape, fill_value=self.label_background, dtype=labels.dtype)
             labels_l[labels == self.label_classes_no_bg[l]] = self.label_classes_no_bg[l]
 
-            dirname_tiff_l = os.path.dirname(file_names[l])
+            dirname_tiff_l = os.path.dirname(filenames[l])
             if len(dirname_tiff_l) > 0:
                 os.makedirs(dirname_tiff_l, exist_ok=True)
 
-            skimage.io.imsave(file_names[l], labels_l, check_contrast=False, plugin='tifffile')
-            # imageio.volsave(uri=file_names[l], im=labels_l, format="tifffile")
+            skimage.io.imsave(filenames[l], labels_l, check_contrast=False, plugin='tifffile')
+            # imageio.volsave(uri=filenames[l], im=labels_l, format="tifffile")
 
         return None
 
@@ -594,11 +594,35 @@ if __name__ == "__main__":
 
     parser.add_argument(
         '-z', '--save_multi_label_zarr', action='store_true', type=bool, required=False,
-        help='If in the arguments, save all predicted labels in one zarr container.')
+        help='If in the arguments, save all labels in one zarr container.')
 
     parser.add_argument(
-        '-Z', '--dirname_of_multi_label_zarr', action='store', type=str,
+        '-Z', '--dirname_of_multi_label_zarr', action='store', default=None, type=str,
         help='The directory path of the multi-label zarr container.')
+
+    parser.add_argument(
+        '-m', '--save_multi_label_tiff', action='store_true', type=bool, required=False,
+        help='If in the arguments, save all labels in one tiff file.')
+
+    parser.add_argument(
+        '-M', '--filename_of_multi_label_tiff', action='store', default=None, type=str,
+        help='The file path of the multi-label tiff file.')
+
+
+    parser.add_argument(
+        '-s', '--save_single_label_tiffs', action='store_true', type=bool, required=False,
+        help='If in the arguments, save different labels in different tiff files.')
+
+    parser.add_argument(
+        '-S', '--filenames_of_single_label_tiffs', action='store', default=None, type=str,
+        help=(
+            'The file paths of the single-label tiff file. Use the following format:\n'
+            '  ["filename_0", "filename_1", ..., "filename_n"]')
+    )
+
+    parser.add_argument(
+        '-t', '--dtype', action='store', default=None, type=str, required=False,
+        help='The numpy array data type of the labels. It accepts "int8", "int16", "int32" and "int64".')
 
     parser.add_argument(
         '-v', '--visualise', action='store_true', type=bool, required=False,
@@ -612,6 +636,11 @@ if __name__ == "__main__":
     args.bias
     args.save_multi_label_zarr
     args.dirname_of_multi_label_zarr
+    args.save_multi_label_tiff
+    args.filename_of_multi_label_tiff
+    args.save_single_label_tiffs
+    args.filenames_of_single_label_tiffs
+    args.dtype_labels
     args.visualise
 
     args.bias = json.loads(args.bias)
@@ -624,9 +653,11 @@ if __name__ == "__main__":
         data=data, bias=args.bias,
         do_save_multi_label_zarr=args.save_multi_label_zarr,
         dirname_of_multi_label_zarr=args.dirname_of_multi_label_zarr,
-        do_save_multi_label_tiff=True, file_name_of_multi_label_tiff=None,
-        do_save_single_label_tiffs=True, file_name_of_single_label_tiffs=None,
-        dtype_labels='int8', do_show=args.visualise)
+        do_save_multi_label_tiff=args.save_multi_label_tiff,
+        filename_of_multi_label_tiff=args.filename_of_multi_label_tiff,
+        do_save_single_label_tiffs=args.save_single_label_tiffs,
+        filenames_of_single_label_tiffs=args.filenames_of_single_label_tiffs,
+        dtype_labels=args.dtype_labels, do_show=args.visualise)
 
     for b in range(0, len(args.bias), 1):
         pos_labels = 0
