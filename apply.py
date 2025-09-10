@@ -630,19 +630,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    args.dirname_data
-    args.filename_model
-    args.background
-    args.bias
-    args.save_multi_label_zarr
-    args.dirname_of_multi_label_zarr
-    args.save_multi_label_tiff
-    args.filename_of_multi_label_tiff
-    args.save_single_label_tiffs
-    args.filenames_of_single_label_tiffs
-    args.dtype
-    args.visualise
-
     args.bias = json.loads(args.bias)
 
     apply = Apply(filename_model=args.filename_model, label_background=args.background)
@@ -676,8 +663,6 @@ if __name__ == "__main__":
 
 # todo:
 
-# - if main, parse input arguments
-
 # - update the doc stings of the functions
 
 # - format all input arguments of the functions before use
@@ -688,3 +673,4 @@ if __name__ == "__main__":
 # done
 # - force skimage.io.imsave to save labels as tiff
 # - update the visualiser to add multiple layers of labels
+# - if main, parse input arguments
