@@ -148,11 +148,10 @@ if __name__ == "__main__":
         data_path = input("Provide the path to data zarr container: ")
         prediction_path = input("Provide the path to prediction zarr container: ")
         validation_or_predict = input("Is this validation or prediction data? (v/p): ")
-
-    while validation_or_predict.lower() != 'v' and validation_or_predict.lower() != 'p':
-        print("-----")
-        print("Invalid input. Please enter 'v' or 'p' only.")
-        validation_or_predict = input("Is this validation or prediction data? (v/p): ")
+        while validation_or_predict.lower() != 'v' and validation_or_predict.lower() != 'p':
+            print("-----")
+            print("Invalid input. Please enter 'v' or 'p' only.")
+            validation_or_predict = input("Is this validation or prediction data? (v/p): ")
 
     if validation_or_predict.lower() == 'v':
         imshow_napari_validation(data_path=data_path, prediction_path= prediction_path) 
