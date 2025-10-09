@@ -13,6 +13,10 @@ def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5
     - html_path: Path to save the HTML visualization of clusters.
     - clusters_path: Path to save the clustered coordinates and labels.
     """
+
+
+    print("running clustering with parameters: ")
+    print(f"eps: {eps}, min_samples: {min_samples}")
     
     # ===== Load Data =====
     print("Opening Zarr file and streaming non-zero points...")
@@ -39,7 +43,9 @@ def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5
     # ===== DBSCAN =====
     clustering = DBSCAN(eps=eps, min_samples=min_samples).fit(locs) # eps 87, min samples 100
     labels = clustering.labels_
-    
+
+    print(f"DBSCAN found {len(set(labels)) - (1 if -1 in labels else 0)} clusters")
+    print("saving results to "+clusters_path)
     # ===== Save coordinates + labels =====
     np.savez_compressed(clusters_path, locs=locs, labels=labels)
 

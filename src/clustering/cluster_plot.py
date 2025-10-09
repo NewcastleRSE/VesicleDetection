@@ -255,20 +255,21 @@ def napari_plot(raw_data, hough_data, locs, labels, out_dir, napari_plot_types=N
             if use_mask:
                 mask = hull_to_mask(points, faces, raw_data.shape, dilation=3)
                 raw_masked[mask] = 0
+        if use_mask:
+            root = zarr.open(out_dir, mode="w")
+            root.create_dataset("masked_raw", shape = raw_masked.shape,data=raw_masked, chunks=(32, 128, 128), overwrite=True)
+            viewer.add_image(raw_masked, name='Masked Clusters', opacity=0.5)
         for cid in hulls: # moving to ensure that all masks are created before any crops
             if create_crops:
                 cropped_mask, cropped_raw = crop_around_mask(raw_masked, mask)
                 crop_name = f"{out_dir}/cluster_{cid}_crop"
                 root = zarr.open(crop_name, mode="w")
-                root.create_dataset("raw", data=cropped_raw, chunks=(32, 128, 128), overwrite=True)
-                root.create_dataset("mask", data=cropped_mask, chunks=(32, 128, 128), overwrite=True)
+                root.create_dataset("raw", shape=cropped_raw.shape, data=cropped_raw, chunks=(32, 128, 128), overwrite=True)
+                root.create_dataset("mask", shape=cropped_mask.shape, data=cropped_mask, chunks=(32, 128, 128), overwrite=True)
                 #viewer.add_image(cropped_raw, name=f'Raw Crop {cid}')
                 #viewer.add_image(cropped_mask.astype(np.float32), name=f'Mask Crop {cid}', opacity=0.5)
                 print(f"Saved cropped data for cluster {cid} to {crop_name}")
-        if use_mask:
-            root = zarr.open(out_dir, mode="w")
-            root.create_dataset("masked_raw", data=raw_masked, chunks=(32, 128, 128), overwrite=True)
-            viewer.add_image(raw_masked, name='Masked Clusters', opacity=0.5)
+
    
     napari.run()
 
@@ -308,7 +309,7 @@ def cluster_plotter():
 
     if args.prediction_path:
         f_pred = zarr.open(args.prediction_path, mode='r')
-        hough_data = f_pred.get('Hough_transformed', None)
+        hough_data = f_pred['Hough_transformed']
         if hough_data is not None:
             hough_data = hough_data[:]
     else:

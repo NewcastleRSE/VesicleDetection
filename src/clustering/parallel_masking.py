@@ -121,6 +121,6 @@ if __name__ == "__main__":
     
     # useage:
     #
-    # python src/clustering/parallel_masking.py <raw_zarr_path> <output_zarr_path> <localizations_npy_path> <labels_npy_path> --n_jobs 8 --plot
+    # python src/clustering/parallel_masking.py <raw_zarr_path> <output_zarr_path> <clusters_path> --n_jobs 8 --plot
     # eg.
-    # python src/clustering/parallel_masking.py /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/all_masked /path/to/locs.npy /path/to/labels.npy --n_jobs 8 --plot
+    # python src/clustering/parallel_masking.py /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/all_masked_dilation1_eps6ms60 /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/clusters_1913sbv_eps6ms60.npz  --n_jobs 8 --plot
