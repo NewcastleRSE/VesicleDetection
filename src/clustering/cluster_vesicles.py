@@ -2,7 +2,7 @@ from sklearn.cluster import DBSCAN
 import numpy as np
 import zarr
 import sys
-import numpy as np
+
 
 def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5, min_samples=100):
     """
