@@ -1,46 +1,119 @@
 import os
 import numpy as np
 import zarr
+import h5py
 from joblib import Parallel, delayed
 
-def crop_volume(center, size, data, out_path, name):
-    """Crop a cube of given size around center from data and save as zarr."""
-    half = size // 2
-    z, y, x = center
 
-    # Bounds check — ensure full cube fits inside data
-    if (
-        z - half < 0 or z + half > data.shape[0] or
-        y - half < 0 or y + half > data.shape[1] or
-        x - half < 0 or x + half > data.shape[2]
-    ):
-        print(f"⚠️  Skipping crop at {center} (out of bounds)")
-        return None  # Skip out-of-bounds crops
+def crop_arr(center, shape, arr, out_path, name):
 
+    """ND Crop: Crop an ND array "arr" and save the .
+
+    :param arr: ND array
+    :type arr: np.ndarray
+    """
+
+    if isinstance(center, (tuple, list)):
+
+        n_dim_from_center = len(center)
+
+        for d in range(0, n_dim_from_center, 1):
+            if not isinstance(center[d], int):
+                raise ValueError('center[{d:d}] must be an int.'.format(d=d))
+
+        center = np.asarray(center, dtype='i')
+
+    elif isinstance(center, np.ndarray):
+        if not center.dtype.kind != 'i':
+            raise ValueError('The type of the numpy array center must int.')
+
+    else:
+        raise TypeError('The center type needs to be an int or series (list, tuple, numpy.ndarray) of ints.')
+
+    if center.ndim != 1:
+        raise ValueError('center must have 1 dimension.')
+
+    if np.any(center < 0):
+        raise ValueError('All elements of center must be greater than or equal to 0.')
+
+    if center.shape[0] != arr.ndim:
+        raise ValueError('shape.shape[0] must be arr.ndim.')
+
+
+    if isinstance(shape, int):
+        shape = np.asarray([shape], dtype='i')
+    elif isinstance(shape, (tuple, list)):
+
+        n_dim_from_shape = len(shape)
+
+        for d in range(0, n_dim_from_shape, 1):
+            if not isinstance(shape[d], int):
+                raise ValueError('shape[{d:d}] must be an int.'.format(d=d))
+
+        shape = np.asarray(shape, dtype='i')
+
+    elif isinstance(shape, np.ndarray):
+        if not shape.dtype.kind != 'i':
+            raise ValueError('The type of the numpy array shape must int.')
+
+    else:
+        raise TypeError('The shape type needs to be an int or series (list, tuple, numpy.ndarray) of ints.')
+
+    if shape.ndim != 1:
+        raise ValueError('shape must have 1 dimension')
+
+    if np.any(shape < 1):
+        raise ValueError('All elements of shape must be greater than 1.')
+
+    if shape.shape[0] != arr.ndim:
+        if shape.shape[0] == 1:
+            # shape = np.full(shape=[arr.ndim], fill_value=shape[0], dtype=shape.dtype)
+            shape = np.broadcast_to(shape, [arr.ndim])
+        else:
+            raise ValueError('shape.shape[0] must be either 1 or arr.ndim.')
+
+    half = shape / 2
 
     # Crop bounds
-    zmin, zmax = max(z - half, 0), min(z + half, data.shape[0])
-    ymin, ymax = max(y - half, 0), min(y + half, data.shape[1])
-    xmin, xmax = max(x - half, 0), min(x + half, data.shape[2])
 
-    crop = data[zmin:zmax, ymin:ymax, xmin:xmax]
+    indexes_start = np.ceil(center - half).astype('i')
+
+    indexes_end = np.ceil(center + half).astype('i')
+
+    # Bounds check — ensure full cube fits inside arr
+    if np.any(indexes_start < 0) or np.any(indexes_end > arr.shape):
+        print(f"⚠️  Skipping crop at {center} with shape {shape} (out of bounds)")
+        return None  # Skip out-of-bounds crops
+
+    # Crop bounds
+    indexes = tuple([slice(indexes_start[d], indexes_end[d], 1) for d in range(0, arr.ndim, 1)])
+
+    crop = arr[indexes]
 
     # Sanity check — ensure cubic shape
-    if not (crop.shape[0] == crop.shape[1] == crop.shape[2] == size):
-        print(f"⚠️  Non-cubic crop at {center}, got shape {crop.shape}")
-        return None
+    if np.any([crop.shape[d] != shape[d] for d in range(0, arr.ndim, 1)]):
+        raise ValueError('For any dimension d, crop.shape[d] must be equal to shape[d].')
 
     # Save to zarr
-    root = zarr.open(out_path, mode="w")
-    root.create_dataset(
-        name,
-        shape=crop.shape,
-        chunks=(32, 128, 128),
-        dtype=crop.dtype,
-        data=crop,
-        overwrite=False,
+    # root = zarr.open(out_path, mode="w")
+    # root.create_dataset(
+    #     name,
+    #     shape=crop.shape,
+    #     chunks=(32, 128, 128),
+    #     dtype=crop.dtype,
+    #     data=crop,
+    #     overwrite=False,
+    # )
+
+    f = h5py.File(out_path, 'w')
+    dset = f.create_dataset(
+        name=name, data=arr, compression="gzip", compression_opts=9,
+        # chunks=a.shape
     )
-    return out_path
+    f.close()
+
+
+    return crop
 
 
 def process_cluster_crop(cid, locs, raw, labels, masked, crop_size_vox, out_dir):
@@ -52,8 +125,8 @@ def process_cluster_crop(cid, locs, raw, labels, masked, crop_size_vox, out_dir)
     raw_path = os.path.join(out_dir, f"cluster_{cid}_raw.zarr")
     masked_path = os.path.join(out_dir, f"cluster_{cid}_masked.zarr")
 
-    crop_volume(center, crop_size_vox, raw, raw_path, "raw")
-    crop_volume(center, crop_size_vox, masked, masked_path, "masked")
+    crop_arr(center, crop_size_vox, raw, raw_path, "raw")
+    crop_arr(center, crop_size_vox, masked, masked_path, "masked")
     print(f"Saved cluster {cid} crops")
     return cid
 
