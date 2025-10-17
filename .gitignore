@@ -176,3 +176,4 @@ Notebook/
 Model_checkpoints/
 
 saved_models/
+/predicted_labels
