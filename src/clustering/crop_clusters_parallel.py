@@ -7,7 +7,7 @@ from joblib import Parallel, delayed
 
 def crop_arr(center, shape, arr, out_path, name):
 
-    """ND Crop: Crop an ND array "arr" and save the .
+    """ND Crop: Crop an ND array "arr" and save the Crop.
 
     :param arr: ND array
     :type arr: np.ndarray
