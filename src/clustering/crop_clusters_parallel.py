@@ -108,7 +108,7 @@ def crop_arr(center, shape, arr, out_path, name):
     f = h5py.File(out_path, 'w')
     dset = f.create_dataset(
         name=name, data=arr, compression="gzip", compression_opts=9,
-        # chunks=a.shape
+        # chunks=arr.shape
     )
     f.close()
 
