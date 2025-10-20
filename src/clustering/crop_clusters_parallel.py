@@ -24,7 +24,7 @@ def crop_arr(center, shape, arr, out_path, name):
         center = np.asarray(center, dtype='i')
 
     elif isinstance(center, np.ndarray):
-        if not center.dtype.kind != 'i':
+        if center.dtype.kind not in ['i', 'u']:
             raise ValueError('The type of the numpy array center must int.')
 
     else:
