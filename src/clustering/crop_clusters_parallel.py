@@ -53,7 +53,7 @@ def crop_arr(center, shape, arr, out_path, name):
         shape = np.asarray(shape, dtype='i')
 
     elif isinstance(shape, np.ndarray):
-        if not shape.dtype.kind != 'i':
+        if shape.dtype.kind not in ['i', 'u']:
             raise ValueError('The type of the numpy array shape must int.')
 
     else:
