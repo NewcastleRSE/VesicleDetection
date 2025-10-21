@@ -15,7 +15,9 @@ def convert_to_zarr_predict():
         mode = 'w'
 
     f = zarr.open(TIFF_TO_ZARR_PREDICT_CONFIG.output_zarr_path, mode=mode)
-
+    
+    if not os.path.exists(TIFF_TO_ZARR_PREDICT_CONFIG.path_to_raw_tiff):
+        raise FileNotFoundError(f"Path to raw TIFF files does not exist: {TIFF_TO_ZARR_PREDICT_CONFIG.path_to_raw_tiff}")
     # Get raw tiff data
     raw_dir = TIFF_TO_ZARR_PREDICT_CONFIG.path_to_raw_tiff
     raw_files = sorted(glob.glob(os.path.join(raw_dir, '*.tif')))
