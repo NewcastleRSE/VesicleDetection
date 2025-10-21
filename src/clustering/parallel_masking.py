@@ -45,12 +45,10 @@ def process_cluster(locs, labels, cid, mask_zarr, dilation=0):
     print(f"Cluster {cid} processed.")
 
 
-def mask_clusters_parallel(raw_path, out_path, npz, plot=False, n_jobs=4, dilation=0):
+def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, dilation=0):
     # Open raw data
     f_raw = zarr.open(raw_path, mode='r')
     raw = f_raw['raw']
-
-    locs, labels = load_clusters(npz)
 
     # Create output zarr datasets
     root_out = zarr.open(out_path, mode='w')
@@ -69,12 +67,30 @@ def mask_clusters_parallel(raw_path, out_path, npz, plot=False, n_jobs=4, dilati
         overwrite=True,
     )
 
-    # Run clusters in parallel
-    unique_clusters = np.unique(labels[labels >= 0])
-    Parallel(n_jobs=n_jobs, prefer="processes")(
-        delayed(process_cluster)(locs, labels, cid, mask, dilation)
-        for cid in unique_clusters
-    )
+    if mask_file.endswith('.npz'):
+        locs, labels = load_clusters(mask_file)
+            # Run clusters in parallel
+        unique_clusters = np.unique(labels[labels >= 0])
+        Parallel(n_jobs=n_jobs, prefer="processes")(
+            delayed(process_cluster)(locs, labels, cid, mask, dilation)
+            for cid in unique_clusters
+        )
+    else:
+        try:
+            f_mask = zarr.open(mask_file, mode='r')
+            labels = f_mask['Hough_transformed'][:]
+            assert labels.shape == raw.shape, "Labels shape must match raw data shape"
+
+            # Process chunk-by-chunk (in case of large data)
+            for idx in np.ndindex(*[int(np.ceil(s/c)) for s, c in zip(raw.shape, raw.chunks)]):
+                slices = tuple(slice(i*c, min((i+1)*c, s)) for i, (s, c) in zip(idx, zip(raw.shape, raw.chunks)))
+                label_chunk = labels[slices]
+                mask_chunk = np.isin(label_chunk, [1, 2])
+                mask[slices] = mask_chunk
+        except Exception as e:
+            print(f"Error loading mask_file as zarr: {e}")
+            return
+
 
     # Apply mask once
     coords = np.where(mask)
@@ -95,7 +111,11 @@ def mask_clusters_parallel(raw_path, out_path, npz, plot=False, n_jobs=4, dilati
         viewer = napari.Viewer()
         viewer.add_image(raw, name="Raw")
         viewer.add_image(masked, name="Masked Raw")
-        viewer.add_labels(mask.astype(np.uint8), name="Mask", opacity=0.5)
+        if mask_file.endswith('.npz'):
+            viewer.add_labels(mask.astype(np.uint8), name="Mask", opacity=0.5)
+        else:
+            viewer.add_labels(np.array(mask, dtype=np.uint8), name="Mask", opacity=0.5)
+
         napari.run()
 
 
@@ -106,7 +126,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("raw_path", type=str, help="Path to input zarr with raw data.")
     parser.add_argument("out_path", type=str, help="Path to output zarr for masked data and mask.")
-    parser.add_argument("npz", type=str, help="Path to npz file with locs and labels.")
+    parser.add_argument("mask_file", type=str, help="Path to npz or zarr file with locs and labels/ hough_transformed data.")
     parser.add_argument("--n_jobs", type=int, default=4, help="Number of parallel jobs.")
     parser.add_argument("--plot", action="store_true", help="Whether to plot results in napari.")
     parser.add_argument("--dilation", type=int, default=0, help="Dilation radius for mask.")
@@ -114,7 +134,7 @@ if __name__ == "__main__":
 
     mask_clusters_parallel(raw_path=args.raw_path,
                            out_path=args.out_path,
-                           npz=args.npz,
+                           mask_file=args.mask_file,
                            n_jobs=args.n_jobs,
                            plot=args.plot,
                            dilation=args.dilation or 0)
@@ -123,4 +143,18 @@ if __name__ == "__main__":
     #
     # python src/clustering/parallel_masking.py <raw_zarr_path> <output_zarr_path> <clusters_path> --n_jobs 8 --plot
     # eg.
-    # python src/clustering/parallel_masking.py /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/all_masked_dilation1_eps6ms60 /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/clusters_1913sbv_eps6ms60.npz  --n_jobs 8 --plot
+    # python src/clustering/parallel_masking.py \
+    # /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict \
+    # /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/all_masked_dilation1_eps6ms200 \
+    # /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms200.npz  \
+    # --n_jobs 8 \
+    # --plot
+
+    # or for hough transformed zarr:
+    #
+    # python src/clustering/parallel_masking.py \
+    # /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict \
+    # /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/vesicle_masked_dilation1 \
+    # /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/Predictions/31_07_2025  \
+    # --n_jobs 8 \
+    # --plot
