@@ -24,9 +24,8 @@ def crop_arr(center, shape, arr, out_path, name):
         center = np.asarray(center, dtype='i')
 
     elif isinstance(center, np.ndarray):
-        pass
-    #     if not center.dtype.kind != 'i':
-    #         raise ValueError('The type of the numpy array center must int.')
+        if center.dtype.kind not in ['i', 'u']:
+            raise ValueError('The type of the numpy array center must int.')
 
     else:
         raise TypeError('The center type needs to be an int or series (list, tuple, numpy.ndarray) of ints.')
@@ -54,7 +53,7 @@ def crop_arr(center, shape, arr, out_path, name):
         shape = np.asarray(shape, dtype='i')
 
     elif isinstance(shape, np.ndarray):
-        if not shape.dtype.kind != 'i':
+        if shape.dtype.kind not in ['i', 'u']:
             raise ValueError('The type of the numpy array shape must int.')
 
     else:
@@ -109,7 +108,7 @@ def crop_arr(center, shape, arr, out_path, name):
     f = h5py.File(out_path, 'w')
     dset = f.create_dataset(
         name=name, data=arr, compression="gzip", compression_opts=9,
-        # chunks=a.shape
+        # chunks=arr.shape
     )
     f.close()
 
