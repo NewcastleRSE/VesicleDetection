@@ -24,8 +24,9 @@ def crop_arr(center, shape, arr, out_path, name):
         center = np.asarray(center, dtype='i')
 
     elif isinstance(center, np.ndarray):
-        if not center.dtype.kind != 'i':
-            raise ValueError('The type of the numpy array center must int.')
+        pass
+    #     if not center.dtype.kind != 'i':
+    #         raise ValueError('The type of the numpy array center must int.')
 
     else:
         raise TypeError('The center type needs to be an int or series (list, tuple, numpy.ndarray) of ints.')
@@ -122,8 +123,8 @@ def process_cluster_crop(cid, locs, raw, labels, masked, crop_size_vox, out_dir)
         return None
     center = np.round(cluster_points.mean(axis=0)).astype(int)
 
-    raw_path = os.path.join(out_dir, f"cluster_{cid}_raw.zarr")
-    masked_path = os.path.join(out_dir, f"cluster_{cid}_masked.zarr")
+    raw_path = os.path.join(out_dir, "raw", f"cluster_{cid}_raw.h5")
+    masked_path = os.path.join(out_dir, "masked", f"cluster_{cid}_masked.h5")
 
     crop_arr(center, crop_size_vox, raw, raw_path, "raw")
     crop_arr(center, crop_size_vox, masked, masked_path, "masked")
@@ -170,6 +171,8 @@ def crop_clusters_parallel(raw_path, masked_path, npz_path=None, out_dir=None, c
     print(f"Crop size: {crop_size_vox} voxels ({crop_um} µm)")
 
     os.makedirs(out_dir, exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "raw"), exist_ok=True)
+    os.makedirs(os.path.join(out_dir, "masked"), exist_ok=True)
 
     # Parallel crop
     Parallel(n_jobs=n_jobs, prefer="threads")(
@@ -227,7 +230,7 @@ if __name__ == "__main__":
 # --raw_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/ \
 # --masked_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/all_masked_dilation1_eps6ms60 \
 # --npz /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms60.npz \
-# --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/cluster_crops/ \
+# --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops.h5 \
 # --n_jobs 8 \
 # --min_points 2000 
 
