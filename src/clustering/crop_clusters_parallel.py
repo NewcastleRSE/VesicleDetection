@@ -107,7 +107,7 @@ def crop_arr(center, shape, arr, out_path, name):
 
     f = h5py.File(out_path, 'w')
     dset = f.create_dataset(
-        name=name, data=arr, compression="gzip", compression_opts=9,
+        name=name, data=crop, compression="gzip", compression_opts=9,
         # chunks=arr.shape
     )
     f.close()
@@ -227,9 +227,9 @@ if __name__ == "__main__":
 #
 # python src/clustering/crop_clusters_parallel.py \
 # --raw_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/ \
-# --masked_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/all_masked_dilation1_eps6ms60 \
+# --masked_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/vesicle_masked_dilation1 \
 # --npz /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms60.npz \
-# --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops.h5 \
+# --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_vesiclemasked \
 # --n_jobs 8 \
 # --min_points 2000 
 
