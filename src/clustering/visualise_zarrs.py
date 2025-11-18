@@ -3,6 +3,7 @@ import napari
 import sys
 import h5py
 from pathlib import Path
+import numpy as np
 
 
 def plot_files(paths):
@@ -15,53 +16,57 @@ def plot_files(paths):
 
     for path in paths:
         print(f"Visualizing {path}")
-        if path is int:
+        try: # if path is a cluster id:
+            int(path) # should thow error if not int
+            print(f"Interpreting {path} as cluster ID")
             plot_clusterid(path, viewer)
-            # assume this is a cluster ID, and find and plot its crops
-        elif path.endswith('.h5'):
-            print("Loading h5 file")
-            f = h5py.File(path, 'r')
-            # Assume dataset name is same as file name without extension
-            dset_name = path.split('/')[-1].replace('.h5', '')
-            if dset_name in f:
-                dat = f[dset_name][:]
-                option = ''
-            else:
-                # If not found, just take the first dataset
-                first_key = list(f.keys())[0]
-                dat = f[first_key][:]
-                option = ''
-            f.close()
-            viewer.add_image(data=zarrdat, name=path.split("/")[-1]+option, blending='additive', colormap='grey', contrast_limits=[dat.min(), dat.max()])
-        elif has_masked_and_raw(path):
-            # check if the path has subfolders 'raw' and 'masked'
-            plot_all_cluster_crops(path, viewer)
-        else:
-            try:
-                image = zarr.open(path, mode='r')        
-                if 'raw' in image:
-                    zarrdat = image['raw'][:,:,:]
-                    option = '_raw'
-                elif 'masked_raw' in image:
-                    zarrdat = image['masked_raw'][:,:,:]
-                    option = '_masked'
-                elif 'mask' in image:
-                    zarrdat = image['mask'][:,:,:]
-                    option = '_mask'
-                elif 'masked' in image:
-                    zarrdat = image['masked'][:,:,:]
-                    option = '_masked'
-                elif 'masks' in image:
-                    zarrdat = image['masks'][:,:,:]
-                    option = '_masks'
-                else:
-                    zarrdat = image[:,:,:]
+        except ValueError:
+            if path.endswith('.h5'):
+                print("Loading h5 file")
+                f = h5py.File(path, 'r')
+                # Assume dataset name is same as file name without extension
+                dset_name = path.split('/')[-1].replace('.h5', '')
+                if dset_name in f:
+                    dat = f[dset_name][:]
                     option = ''
-                viewer.add_image(data=zarrdat, name=path.split("/")[-1]+option, blending='additive', colormap='grey', contrast_limits=[zarrdat.min(), zarrdat.max()])
-            except Exception as e:
-                print(f"Error loading {path} as zarr: {e}")
-                pass
-    
+                else:
+                    # If not found, just take the first dataset
+                    first_key = list(f.keys())[0]
+                    dat = f[first_key][:]
+                    option = ''
+                f.close()
+                viewer.add_image(data=zarrdat, name=path.split("/")[-1]+option, blending='additive', colormap='grey', contrast_limits=[dat.min(), dat.max()])
+            elif has_masked_and_raw(path):
+                print("Loading raw and masked datasets from subfolders")
+                # check if the path has subfolders 'raw' and 'masked'
+                plot_all_cluster_crops(path, viewer)
+            else:
+                print("Loading zarr file")
+                try:
+                    image = zarr.open(path, mode='r')
+                    if 'raw' in image:
+                        zarrdat = image['raw'][:,:,:]
+                        option = '_raw'
+                    elif 'masked_raw' in image:
+                        zarrdat = image['masked_raw'][:,:,:]
+                        option = '_masked'
+                    elif 'mask' in image:
+                        zarrdat = image['mask'][:,:,:]
+                        option = '_mask'
+                    elif 'masked' in image:
+                        zarrdat = image['masked'][:,:,:]
+                        option = '_masked'
+                    elif 'masks' in image:
+                        zarrdat = image['masks'][:,:,:]
+                        option = '_masks'
+                    else:
+                        zarrdat = image[:,:,:]
+                        option = ''
+                    viewer.add_image(data=zarrdat, name=path.split("/")[-1]+option, blending='additive', colormap='grey', contrast_limits=[zarrdat.min(), zarrdat.max()])
+                except Exception as e:
+                    print(f"Error loading {path} as zarr: {e}")
+                    pass
+        
     napari.run()
 
 def plot_clusterid(path, viewer):
@@ -80,18 +85,32 @@ def plot_clusterid(path, viewer):
     raw_path = f"data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops/raw/cluster_{path}_raw.h5"
     print(f"Loading cluster mask from {mask_path}")
     f = h5py.File(mask_path, 'r')
-    dset_name = f"cluster_{path}_masked"
+    dset_name = "masked"
     if dset_name in f:
-        maskdat = f[dset_name][:]
-        option = '_masked'
+        maskdat = f[dset_name][:] 
+    else:
+        # If not found, just take the first dataset
+        first_key = list(f.keys())[0]
+        maskdat = f[first_key][:]
     f.close()
     print(f"Loading cluster raw from {raw_path}")
     f = h5py.File(raw_path, 'r')
-    dset_name = f"cluster_{path}_raw"
+    dset_name = f"raw"
     if dset_name in f:
         rawdat = f[dset_name][:]
-        option = '_raw'
+    else:
+        # If not found, just take the first dataset
+        first_key = list(f.keys())[0]
+        rawdat = f[first_key][:]
     f.close()
+    center = np.array(rawdat.shape) / 2
+    points = np.array([center])
+    viewer.add_points(
+        points,
+        name="center marker",
+        size=10,
+        face_color="red"
+        ) 
     viewer.add_image(data=maskdat, name=f"cluster_{path}_masked", blending='additive', colormap='grey', contrast_limits=[maskdat.min(), maskdat.max()])
     viewer.add_image(data=rawdat, name=f"cluster_{path}_masked", blending='additive', colormap='grey', contrast_limits=[rawdat.min(), rawdat.max()])
 

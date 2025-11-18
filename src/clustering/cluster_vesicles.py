@@ -2,6 +2,7 @@ from sklearn.cluster import DBSCAN
 import numpy as np
 import zarr
 import sys
+import os
 
 
 def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5, min_samples=100):
@@ -10,7 +11,6 @@ def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5
     
     Parameters:
     - prediction_path: Path to the zarr file containing Hough transformed data. (e.g., '/home/predictions.zarr/predict/Prediction/Hough_transformed')
-    - html_path: Path to save the HTML visualization of clusters.
     - clusters_path: Path to save the clustered coordinates and labels.
     """
 
