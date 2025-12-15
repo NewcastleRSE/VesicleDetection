@@ -3,6 +3,7 @@ import numpy as np
 import zarr
 import h5py
 from joblib import Parallel, delayed
+import pathlib
 
 
 def crop_arr(center, shape, arr, out_path, name):
@@ -181,35 +182,80 @@ def crop_clusters_parallel(raw_path, masked_path, npz_path=None, out_dir=None, c
 
     print(f"All crops saved in {out_dir}")
 
+def crop_files(dir_in, out_dir, crop_um=1.92, n_jobs=4):
+    dir_in = pathlib.Path(dir_in)
+    crop_size_nm = crop_um * 1000  # µm → nm
+    crop_size_vox = int(crop_size_nm / 6)  # assume isotropic 6nm voxels
+    print(f"Crop size: {crop_size_vox} voxels ({crop_um} µm)")
+
+    os.makedirs(out_dir, exist_ok=True)
+
+    def process_file(file_path):
+        f = h5py.File(file_path, 'r')
+        dset_name = file_path.stem  # try dataset name as file name without extension
+        if dset_name in f:
+            dat = f[dset_name][:]
+        else:
+            # If not found, just take the first dataset
+            first_key = list(f.keys())[0]
+            dat = f[first_key][:]
+        f.close()
+        center = np.round(np.array(dat.shape) / 2).astype(int) # assuming the crop is centered 
+        print(f"Cropping file {file_path.name} at center {center}")
+        # and is even sized and large enough for this to work as an approximation
+        out_path = os.path.join(out_dir, file_path.name)
+        crop_arr(center, crop_size_vox, dat, out_path, dset_name)
+        print(f"Cropped and saved {file_path.name}")
+
+    files = list(dir_in.glob('*.h5'))
+    print(f"Cropping {len(files)} files in {dir_in}")
+
+    Parallel(n_jobs=n_jobs, prefer="threads")(
+        delayed(process_file)(file_path)
+        for file_path in files
+    )
+
+    print(f"All crops saved in {out_dir}")
+
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Crop raw and masked data around cluster centers")
-    parser.add_argument("--raw_path", type=str, required=True, help="Path to raw zarr dataset, the folder containing raw")
-    parser.add_argument("--masked_path", type=str, required=True, help="Path to masked zarr dataset, the folder containing masked_raw")
-    parser.add_argument("--npz", type=str, required=True, help="Path to clusters npz")
+    parser.add_argument("--raw_path", type=str, required=False, help="Path to raw zarr dataset, the folder containing raw")
+    parser.add_argument("--masked_path", type=str, required=False, help="Path to masked zarr dataset, the folder containing masked_raw")
+    parser.add_argument("--npz", type=str, required=False, help="Path to clusters npz")
+    parser.add_argument("--dir_in", type=str, help="Input directory for cropping all files in a folder", default=None)
     parser.add_argument("--out_dir", type=str, required=True, help="Output directory for crops")
     parser.add_argument("--n_jobs", type=int, default=4, help="Number of parallel workers")
-    parser.add_argument("--crop_um", type=float, default=1.92, help="Crop size in micrometers")
+    parser.add_argument("--crop_um", type=float, default=1.92, required=True, help="Crop size in micrometers")
     parser.add_argument("--top_clusters", type=int, default=None, help="If set, only process this many largest clusters")
     parser.add_argument("--cluster_ids", type=int, nargs='*', default=None, help="If set, only process these cluster IDs")
     parser.add_argument ("--min_points", type=int, default=500, help="Minimum points to consider a cluster")
     parser.add_argument("--max_points", type=int, default=10000, help="Maximum points to consider a cluster")
 
     args = parser.parse_args()
-    crop_clusters_parallel(
-        raw_path=args.raw_path,
-        masked_path=args.masked_path,
-        npz_path=args.npz,
-        out_dir=args.out_dir,
-        crop_um=args.crop_um,
-        n_jobs=args.n_jobs,
-        top_clusters=args.top_clusters or None,
-        cluster_ids=args.cluster_ids or None,
-        min_points=args.min_points or None,
-        max_points=args.max_points or None,
-    )
+
+    if args.dir_in is not None and os.path.isdir(args.dir_in):
+        print("Cropping all files in directory:", args.dir_in)
+        crop_files(args.dir_in, args.out_dir, args.crop_um, args.n_jobs)
+    elif args.npz is not None:
+        print("Cropping clusters from npz:", args.npz)
+        crop_clusters_parallel(
+            raw_path=args.raw_path,
+            masked_path=args.masked_path,
+            npz_path=args.npz,
+            out_dir=args.out_dir,
+            crop_um=args.crop_um,
+            n_jobs=args.n_jobs,
+            top_clusters=args.top_clusters or None,
+            cluster_ids=args.cluster_ids or None,
+            min_points=args.min_points or None,
+            max_points=args.max_points or None,
+        )
+    else:
+        # crop a single file, need to implement
+        print("Please provide a --npz file for cropping around clusters or a directory --dir_in to crop all files in a folder.")
 
 # Usage example:
 #
@@ -232,4 +278,11 @@ if __name__ == "__main__":
 # --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_vesiclemasked \
 # --n_jobs 8 \
 # --min_points 2000 
-
+# 
+# For cropping all files in a directory:
+#
+# python src/clustering/crop_clusters_parallel.py \
+# --dir_in /path/to/input/h5/files \
+# --out_dir /path/to/output/cropped/files \
+# --n_jobs 8
+# --crop_um 1.92
