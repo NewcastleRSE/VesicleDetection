@@ -74,7 +74,7 @@ def count_positive_per_cluster(
 
         all_keys = sorted(valid_clusters)
         for cid in all_keys:
-            cluster_name = f"cluster_{cid}_masked.zarr" if use_filenames else cid
+            cluster_name = f"cluster_{cid}_masked.h5" if use_filenames else cid
             writer.writerow(
                 [
                     cluster_name,

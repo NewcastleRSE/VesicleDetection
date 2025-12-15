@@ -4,6 +4,8 @@ import zarr
 import h5py
 from joblib import Parallel, delayed
 import pathlib
+from get_cluster_counts import count_positive_per_cluster
+from cluster_count_checker import cluster_count_checker
 
 
 def crop_arr(center, shape, arr, out_path, name, downsample_factor=1):
@@ -155,6 +157,7 @@ def crop_clusters_parallel(
     min_points=None,
     max_points=None,
     downsample_factor=1,
+    make_labels=False,
 ):
     # Load raw & masked datasets
     f_raw = zarr.open(raw_path, mode="r")
@@ -207,6 +210,27 @@ def crop_clusters_parallel(
 
     print(f"All crops saved in {out_dir}")
 
+    if make_labels == True:
+        # Save cluster counts for reference
+        csv_out = os.path.join(out_dir, "counts_clusters.csv")
+        count_positive_per_cluster(
+            npz_path,
+            masked_path,
+            csv_out,
+            chunk_size=1_000_000,
+            min_size=min_points,
+            max_size=max_points,
+            use_filenames=True,
+        )
+
+    cluster_count_checker(
+        os.path.join(out_dir, "counts_clusters.csv"),
+        folder=os.path.join(out_dir, "raw"),
+        corrected_output_path=os.path.join(out_dir, "corrected_counts_clusters.csv"),
+        output_corrected=True
+        )
+
+        
 
 def crop_files(dir_in, out_dir, crop_um=1.92, n_jobs=4, downsample_factor=1):
     """Crop all h5 files in a directory around their center and save to out_dir.
@@ -336,6 +360,12 @@ if __name__ == "__main__":
         help="If >1, downsample data by this integer factor",
     )
 
+    parser.add_argument(
+        "--make_labels",
+        action="store_true",
+        help="If set, generate cluster counts csv in output directory",
+    )
+
     args = parser.parse_args()
 
     if args.dir_in is not None and os.path.isdir(args.dir_in):
@@ -357,6 +387,7 @@ if __name__ == "__main__":
             min_points=args.min_points or None,
             max_points=args.max_points or None,
             downsample_factor=args.downsample_factor,
+            make_labels=True,
         )
     else:
         # crop a single file, need to implement
