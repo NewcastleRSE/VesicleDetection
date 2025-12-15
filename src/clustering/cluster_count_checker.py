@@ -33,3 +33,16 @@ print()
 print(f"Clusters only in CSV ({len(only_csv)}): {sorted(only_csv)}")
 print()
 print(f"Clusters only in filenames ({len(only_files)}): {sorted(only_files)}")
+
+
+# --- export new CSV with only matching clusters ---
+OUTPUT_CSV_PATH = "counts_clusters6_60_filtered_matched.csv"
+with open(CSV_PATH, newline="") as infile, open(OUTPUT_CSV_PATH, "w", newline="") as outfile:
+    reader = csv.DictReader(infile)
+    writer = csv.DictWriter(outfile, fieldnames=reader.fieldnames)
+    writer.writeheader()
+    for row in reader:
+        if int(row["cluster"]) in both:
+            # modify the cluster name to match filenames
+            row["cluster"] = f"cluster_{row['cluster']}_masked.h5"
+            writer.writerow(row)
