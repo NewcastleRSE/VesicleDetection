@@ -6,6 +6,7 @@ from scipy.spatial import ConvexHull, Delaunay
 import zarr
 import napari
 
+
 def hull_to_mask_delaunay(points, shape, mask_zarr, dilation=0):
     """Write the convex hull of points into mask_zarr inplace."""
     hull = ConvexHull(points)
@@ -21,9 +22,7 @@ def hull_to_mask_delaunay(points, shape, mask_zarr, dilation=0):
 
     # Generate coordinates only inside bounding box
     zz, yy, xx = np.indices((maxs - mins))
-    coords = np.c_[zz.ravel() + mins[0],
-                   yy.ravel() + mins[1],
-                   xx.ravel() + mins[2]]
+    coords = np.c_[zz.ravel() + mins[0], yy.ravel() + mins[1], xx.ravel() + mins[2]]
 
     inside = delaunay.find_simplex(coords) >= 0
     mask_local = inside.reshape((maxs - mins))
@@ -32,7 +31,7 @@ def hull_to_mask_delaunay(points, shape, mask_zarr, dilation=0):
         mask_local = binary_dilation(mask_local, iterations=dilation)
 
     # Write into global mask dataset
-    mask_zarr[mins[0]:maxs[0], mins[1]:maxs[1], mins[2]:maxs[2]] |= mask_local
+    mask_zarr[mins[0] : maxs[0], mins[1] : maxs[1], mins[2] : maxs[2]] |= mask_local
 
 
 def process_cluster(locs, labels, cid, mask_zarr, dilation=0):
@@ -45,13 +44,15 @@ def process_cluster(locs, labels, cid, mask_zarr, dilation=0):
     print(f"Cluster {cid} processed.")
 
 
-def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, dilation=0):
+def mask_clusters_parallel(
+    raw_path, out_path, mask_file, plot=False, n_jobs=4, dilation=0
+):
     # Open raw data
-    f_raw = zarr.open(raw_path, mode='r')
-    raw = f_raw['raw']
+    f_raw = zarr.open(raw_path, mode="r")
+    raw = f_raw["raw"]
 
     # Create output zarr datasets
-    root_out = zarr.open(out_path, mode='w')
+    root_out = zarr.open(out_path, mode="w")
     masked = root_out.create_dataset(
         "masked_raw",
         shape=raw.shape,
@@ -67,9 +68,9 @@ def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, 
         overwrite=True,
     )
 
-    if mask_file.endswith('.npz'):
+    if mask_file.endswith(".npz"):
         locs, labels = load_clusters(mask_file)
-            # Run clusters in parallel
+        # Run clusters in parallel
         unique_clusters = np.unique(labels[labels >= 0])
         Parallel(n_jobs=n_jobs, prefer="processes")(
             delayed(process_cluster)(locs, labels, cid, mask, dilation)
@@ -77,20 +78,24 @@ def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, 
         )
     else:
         try:
-            f_mask = zarr.open(mask_file, mode='r')
-            labels = f_mask['Hough_transformed'][:]
+            f_mask = zarr.open(mask_file, mode="r")
+            labels = f_mask["Hough_transformed"][:]
             assert labels.shape == raw.shape, "Labels shape must match raw data shape"
 
             # Process chunk-by-chunk (in case of large data)
-            for idx in np.ndindex(*[int(np.ceil(s/c)) for s, c in zip(raw.shape, raw.chunks)]):
-                slices = tuple(slice(i*c, min((i+1)*c, s)) for i, (s, c) in zip(idx, zip(raw.shape, raw.chunks)))
+            for idx in np.ndindex(
+                *[int(np.ceil(s / c)) for s, c in zip(raw.shape, raw.chunks)]
+            ):
+                slices = tuple(
+                    slice(i * c, min((i + 1) * c, s))
+                    for i, (s, c) in zip(idx, zip(raw.shape, raw.chunks))
+                )
                 label_chunk = labels[slices]
                 mask_chunk = np.isin(label_chunk, [1, 2])
                 mask[slices] = mask_chunk
         except Exception as e:
             print(f"Error loading mask_file as zarr: {e}")
             return
-
 
     # Apply mask once
     coords = np.where(mask)
@@ -106,12 +111,12 @@ def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, 
         masked[z, :, :] = z_data
     print(f"Masked raw saved at {out_path}")
 
-        # Plot in napari
+    # Plot in napari
     if plot:
         viewer = napari.Viewer()
         viewer.add_image(raw, name="Raw")
         viewer.add_image(masked, name="Masked Raw")
-        if mask_file.endswith('.npz'):
+        if mask_file.endswith(".npz"):
             viewer.add_labels(mask.astype(np.uint8), name="Mask", opacity=0.5)
         else:
             viewer.add_labels(np.array(mask, dtype=np.uint8), name="Mask", opacity=0.5)
@@ -121,24 +126,39 @@ def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(
         description="Mask clusters in raw data using convex hulls."
     )
     parser.add_argument("raw_path", type=str, help="Path to input zarr with raw data.")
-    parser.add_argument("out_path", type=str, help="Path to output zarr for masked data and mask.")
-    parser.add_argument("mask_file", type=str, help="Path to npz or zarr file with locs and labels/ hough_transformed data.")
-    parser.add_argument("--n_jobs", type=int, default=4, help="Number of parallel jobs.")
-    parser.add_argument("--plot", action="store_true", help="Whether to plot results in napari.")
-    parser.add_argument("--dilation", type=int, default=0, help="Dilation radius for mask.")
+    parser.add_argument(
+        "out_path", type=str, help="Path to output zarr for masked data and mask."
+    )
+    parser.add_argument(
+        "mask_file",
+        type=str,
+        help="Path to npz or zarr file with locs and labels/ hough_transformed data.",
+    )
+    parser.add_argument(
+        "--n_jobs", type=int, default=4, help="Number of parallel jobs."
+    )
+    parser.add_argument(
+        "--plot", action="store_true", help="Whether to plot results in napari."
+    )
+    parser.add_argument(
+        "--dilation", type=int, default=0, help="Dilation radius for mask."
+    )
     args = parser.parse_args()
 
-    mask_clusters_parallel(raw_path=args.raw_path,
-                           out_path=args.out_path,
-                           mask_file=args.mask_file,
-                           n_jobs=args.n_jobs,
-                           plot=args.plot,
-                           dilation=args.dilation or 0)
-    
+    mask_clusters_parallel(
+        raw_path=args.raw_path,
+        out_path=args.out_path,
+        mask_file=args.mask_file,
+        n_jobs=args.n_jobs,
+        plot=args.plot,
+        dilation=args.dilation or 0,
+    )
+
     # useage:
     #
     # python src/clustering/parallel_masking.py <raw_zarr_path> <output_zarr_path> <clusters_path> --n_jobs 8 --plot

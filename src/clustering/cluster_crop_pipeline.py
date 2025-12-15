@@ -3,6 +3,7 @@ from parallel_masking import mask_clusters_parallel
 from crop_clusters_parallel import crop_clusters_parallel
 from get_cluster_counts import count_positive_per_cluster
 
+
 def cluster_crop_pipeline(
     predictions_path,
     npz_path,
@@ -61,24 +62,54 @@ def cluster_crop_pipeline(
 
     print("Clustering and cropping pipeline completed.")
 
+
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Cluster and crop vesicles pipeline.")
-    parser.add_argument("--predictions_path", required=True, help="Path to hough transformed zarr data.")
-    parser.add_argument("--npz_path", required=False, help="Output path for clustered npz file.")
-    parser.add_argument("--eps", required=False, help="DBscan clustering parameter eps, float.")
-    parser.add_argument("--min_samples", required=False, help="DBscan clustering parameter min_samples.")
+    parser.add_argument(
+        "--predictions_path", required=True, help="Path to hough transformed zarr data."
+    )
+    parser.add_argument(
+        "--npz_path", required=False, help="Output path for clustered npz file."
+    )
+    parser.add_argument(
+        "--eps", required=False, help="DBscan clustering parameter eps, float."
+    )
+    parser.add_argument(
+        "--min_samples", required=False, help="DBscan clustering parameter min_samples."
+    )
     parser.add_argument("--raw_path", required=True, help="Path to raw zarr dataset.")
-    parser.add_argument("--out_masked_path", required=True, help="Output path for masked raw data.")
-    parser.add_argument("--out_cropped_path", required=True, help="Output path for cropped clusters.")
-    parser.add_argument("--csv_out", required=True, help="Output CSV file for cluster counts.")
-    parser.add_argument("--dilation", type=int, default=2, help="Dilation size for masking.")
-    parser.add_argument("--n_jobs", type=int, default=4, help="Number of parallel jobs.")
-    parser.add_argument("--chunk_size", type=int, default=100000, help="Chunk size for counting positives.")
-    parser.add_argument("--min_size", type=int, default=None, help="Minimum cluster size to include.")
-    parser.add_argument("--max_size", type=int, default=None, help="Maximum cluster size to include.")
-    parser.add_argument("--use_filenames", action="store_true", help="Use filenames in CSV output.")
+    parser.add_argument(
+        "--out_masked_path", required=True, help="Output path for masked raw data."
+    )
+    parser.add_argument(
+        "--out_cropped_path", required=True, help="Output path for cropped clusters."
+    )
+    parser.add_argument(
+        "--csv_out", required=True, help="Output CSV file for cluster counts."
+    )
+    parser.add_argument(
+        "--dilation", type=int, default=2, help="Dilation size for masking."
+    )
+    parser.add_argument(
+        "--n_jobs", type=int, default=4, help="Number of parallel jobs."
+    )
+    parser.add_argument(
+        "--chunk_size",
+        type=int,
+        default=100000,
+        help="Chunk size for counting positives.",
+    )
+    parser.add_argument(
+        "--min_size", type=int, default=None, help="Minimum cluster size to include."
+    )
+    parser.add_argument(
+        "--max_size", type=int, default=None, help="Maximum cluster size to include."
+    )
+    parser.add_argument(
+        "--use_filenames", action="store_true", help="Use filenames in CSV output."
+    )
 
     args = parser.parse_args()
     print("Starting clustering and cropping pipeline...")
@@ -102,17 +133,17 @@ if __name__ == "__main__":
 # Example usage:
 #
 # python src/clustering/cluster_crop_pipeline.py \
-    # --predictions_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/Predictions/31_07_2025/Hough_transformed \
-    # --npz_path Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms200 \
-    # --eps 6.0 \
-    # --min_samples 200 \
-    # --raw_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/ \
-    # --out_masked_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/masked_e6ms200 \
-    # --out_cropped_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/cropped_clusters_e6ms200/ \
-    # --csv_out data/cluster_counts.csv \
-    # --dilation 2 \
-    # --n_jobs 8 \
-    # --chunk_size 100000 \
-    # --min_size  2000\
-    # --max_size 100000 \
-    # --use_filenames
+# --predictions_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/Predictions/31_07_2025/Hough_transformed \
+# --npz_path Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms200 \
+# --eps 6.0 \
+# --min_samples 200 \
+# --raw_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/ \
+# --out_masked_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/masked_e6ms200 \
+# --out_cropped_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/cropped_clusters_e6ms200/ \
+# --csv_out data/cluster_counts.csv \
+# --dilation 2 \
+# --n_jobs 8 \
+# --chunk_size 100000 \
+# --min_size  2000\
+# --max_size 100000 \
+# --use_filenames

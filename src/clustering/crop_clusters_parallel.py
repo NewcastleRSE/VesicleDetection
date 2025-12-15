@@ -6,80 +6,90 @@ from joblib import Parallel, delayed
 import pathlib
 
 
-def crop_arr(center, shape, arr, out_path, name):
-
+def crop_arr(center, shape, arr, out_path, name, downsample_factor=1):
     """ND Crop: Crop an ND array "arr" and save the Crop.
 
-    :param arr: ND array
-    :type arr: np.ndarray
+    center : int, tuple, list, np.ndarray
+        Center of the crop.
+    shape : int, tuple, list, np.ndarray
+        Shape of the crop.
+    arr : np.ndarray
+        Input array to be cropped.
+    out_path : str
+        Path to save the cropped array.
+    name : str
+        Name of the dataset to save in the h5 file.
+    downsample_factor : int, optional
+        If >1, downsample the cropped array by this integer factor before saving.
+        Defaults to 1 (no downsampling).
     """
 
     if isinstance(center, (tuple, list)):
-
         n_dim_from_center = len(center)
 
         for d in range(0, n_dim_from_center, 1):
             if not isinstance(center[d], int):
-                raise ValueError('center[{d:d}] must be an int.'.format(d=d))
+                raise ValueError("center[{d:d}] must be an int.".format(d=d))
 
-        center = np.asarray(center, dtype='i')
+        center = np.asarray(center, dtype="i")
 
     elif isinstance(center, np.ndarray):
-        if center.dtype.kind not in ['i', 'u']:
-            raise ValueError('The type of the numpy array center must int.')
+        if center.dtype.kind not in ["i", "u"]:
+            raise ValueError("The type of the numpy array center must int.")
 
     else:
-        raise TypeError('The center type needs to be an int or series (list, tuple, numpy.ndarray) of ints.')
+        raise TypeError(
+            "The center type needs to be an int or series (list, tuple, numpy.ndarray) of ints."
+        )
 
     if center.ndim != 1:
-        raise ValueError('center must have 1 dimension.')
+        raise ValueError("center must have 1 dimension.")
 
     if np.any(center < 0):
-        raise ValueError('All elements of center must be greater than or equal to 0.')
+        raise ValueError("All elements of center must be greater than or equal to 0.")
 
     if center.shape[0] != arr.ndim:
-        raise ValueError('shape.shape[0] must be arr.ndim.')
-
+        raise ValueError("shape.shape[0] must be arr.ndim.")
 
     if isinstance(shape, int):
-        shape = np.asarray([shape], dtype='i')
+        shape = np.asarray([shape], dtype="i")
     elif isinstance(shape, (tuple, list)):
-
         n_dim_from_shape = len(shape)
 
         for d in range(0, n_dim_from_shape, 1):
             if not isinstance(shape[d], int):
-                raise ValueError('shape[{d:d}] must be an int.'.format(d=d))
+                raise ValueError("shape[{d:d}] must be an int.".format(d=d))
 
-        shape = np.asarray(shape, dtype='i')
+        shape = np.asarray(shape, dtype="i")
 
     elif isinstance(shape, np.ndarray):
-        if shape.dtype.kind not in ['i', 'u']:
-            raise ValueError('The type of the numpy array shape must int.')
+        if shape.dtype.kind not in ["i", "u"]:
+            raise ValueError("The type of the numpy array shape must int.")
 
     else:
-        raise TypeError('The shape type needs to be an int or series (list, tuple, numpy.ndarray) of ints.')
+        raise TypeError(
+            "The shape type needs to be an int or series (list, tuple, numpy.ndarray) of ints."
+        )
 
     if shape.ndim != 1:
-        raise ValueError('shape must have 1 dimension')
+        raise ValueError("shape must have 1 dimension")
 
     if np.any(shape < 1):
-        raise ValueError('All elements of shape must be greater than 1.')
+        raise ValueError("All elements of shape must be greater than 1.")
 
     if shape.shape[0] != arr.ndim:
         if shape.shape[0] == 1:
             # shape = np.full(shape=[arr.ndim], fill_value=shape[0], dtype=shape.dtype)
             shape = np.broadcast_to(shape, [arr.ndim])
         else:
-            raise ValueError('shape.shape[0] must be either 1 or arr.ndim.')
+            raise ValueError("shape.shape[0] must be either 1 or arr.ndim.")
 
     half = shape / 2
 
     # Crop bounds
+    indexes_start = np.ceil(center - half).astype("i")
 
-    indexes_start = np.ceil(center - half).astype('i')
-
-    indexes_end = np.ceil(center + half).astype('i')
+    indexes_end = np.ceil(center + half).astype("i")
 
     # Bounds check — ensure full cube fits inside arr
     if np.any(indexes_start < 0) or np.any(indexes_end > arr.shape):
@@ -87,37 +97,37 @@ def crop_arr(center, shape, arr, out_path, name):
         return None  # Skip out-of-bounds crops
 
     # Crop bounds
-    indexes = tuple([slice(indexes_start[d], indexes_end[d], 1) for d in range(0, arr.ndim, 1)])
+    indexes = tuple(
+        [slice(indexes_start[d], indexes_end[d], 1) for d in range(0, arr.ndim, 1)]
+    )
 
     crop = arr[indexes]
 
+    if downsample_factor > 1:
+        crop = downsample_by_factor(crop, downsample_factor)
+
     # Sanity check — ensure cubic shape
     if np.any([crop.shape[d] != shape[d] for d in range(0, arr.ndim, 1)]):
-        raise ValueError('For any dimension d, crop.shape[d] must be equal to shape[d].')
+        raise ValueError(
+            "For any dimension d, crop.shape[d] must be equal to shape[d]."
+        )
 
-    # Save to zarr
-    # root = zarr.open(out_path, mode="w")
-    # root.create_dataset(
-    #     name,
-    #     shape=crop.shape,
-    #     chunks=(32, 128, 128),
-    #     dtype=crop.dtype,
-    #     data=crop,
-    #     overwrite=False,
-    # )
-
-    f = h5py.File(out_path, 'w')
-    dset = f.create_dataset(
-        name=name, data=crop, compression="gzip", compression_opts=9,
+    f = h5py.File(out_path, "w")
+    f.create_dataset(
+        name=name,
+        data=crop,
+        compression="gzip",
+        compression_opts=9,
         # chunks=arr.shape
     )
     f.close()
 
-
     return crop
 
 
-def process_cluster_crop(cid, locs, raw, labels, masked, crop_size_vox, out_dir):
+def process_cluster_crop(
+    cid, locs, raw, labels, masked, crop_size_vox, out_dir, downsample_factor=1
+):
     cluster_points = locs[labels == cid]
     if len(cluster_points) == 0:
         return None
@@ -126,13 +136,26 @@ def process_cluster_crop(cid, locs, raw, labels, masked, crop_size_vox, out_dir)
     raw_path = os.path.join(out_dir, "raw", f"cluster_{cid}_raw.h5")
     masked_path = os.path.join(out_dir, "masked", f"cluster_{cid}_masked.h5")
 
-    crop_arr(center, crop_size_vox, raw, raw_path, "raw")
-    crop_arr(center, crop_size_vox, masked, masked_path, "masked")
+    crop_arr(center, crop_size_vox, raw, raw_path, "raw", downsample_factor)
+    crop_arr(center, crop_size_vox, masked, masked_path, "masked", downsample_factor)
     print(f"Saved cluster {cid} crops")
     return cid
 
 
-def crop_clusters_parallel(raw_path, masked_path, npz_path=None, out_dir=None, crop_um=1.92, voxel_size_nm=(6,6,6), n_jobs=4, top_clusters=None, cluster_ids=None, min_points=None, max_points=None):
+def crop_clusters_parallel(
+    raw_path,
+    masked_path,
+    npz_path=None,
+    out_dir=None,
+    crop_um=1.92,
+    voxel_size_nm=(6, 6, 6),
+    n_jobs=4,
+    top_clusters=None,
+    cluster_ids=None,
+    min_points=None,
+    max_points=None,
+    downsample_factor=1,
+):
     # Load raw & masked datasets
     f_raw = zarr.open(raw_path, mode="r")
     raw = f_raw["raw"]
@@ -176,13 +199,24 @@ def crop_clusters_parallel(raw_path, masked_path, npz_path=None, out_dir=None, c
 
     # Parallel crop
     Parallel(n_jobs=n_jobs, prefer="threads")(
-        delayed(process_cluster_crop)(cid, locs, raw, labels, masked, crop_size_vox, out_dir)
+        delayed(process_cluster_crop)(
+            cid, locs, raw, labels, masked, crop_size_vox, out_dir, downsample_factor
+        )
         for cid in selected_clusters
     )
 
     print(f"All crops saved in {out_dir}")
 
-def crop_files(dir_in, out_dir, crop_um=1.92, n_jobs=4):
+
+def crop_files(dir_in, out_dir, crop_um=1.92, n_jobs=4, downsample_factor=1):
+    """Crop all h5 files in a directory around their center and save to out_dir.
+
+    Args:
+        dir_in (str): Input directory containing h5 files.
+        out_dir (str): Output directory for cropped files.
+        crop_um (float, optional): Crop size in micrometers. Crop will be cubic. Defaults to 1.92.
+        n_jobs (int, optional): Number of jobs for parallelisation. Defaults to 4.
+    """
     dir_in = pathlib.Path(dir_in)
     crop_size_nm = crop_um * 1000  # µm → nm
     crop_size_vox = int(crop_size_nm / 6)  # assume isotropic 6nm voxels
@@ -191,7 +225,7 @@ def crop_files(dir_in, out_dir, crop_um=1.92, n_jobs=4):
     os.makedirs(out_dir, exist_ok=True)
 
     def process_file(file_path):
-        f = h5py.File(file_path, 'r')
+        f = h5py.File(file_path, "r")
         dset_name = file_path.stem  # try dataset name as file name without extension
         if dset_name in f:
             dat = f[dset_name][:]
@@ -200,45 +234,115 @@ def crop_files(dir_in, out_dir, crop_um=1.92, n_jobs=4):
             first_key = list(f.keys())[0]
             dat = f[first_key][:]
         f.close()
-        center = np.round(np.array(dat.shape) / 2).astype(int) # assuming the crop is centered 
+        center = np.round(np.array(dat.shape) / 2).astype(
+            int
+        )  # assuming the crop is centered
         print(f"Cropping file {file_path.name} at center {center}")
         # and is even sized and large enough for this to work as an approximation
         out_path = os.path.join(out_dir, file_path.name)
-        crop_arr(center, crop_size_vox, dat, out_path, dset_name)
+        crop_arr(center, crop_size_vox, dat, out_path, dset_name, downsample_factor)
         print(f"Cropped and saved {file_path.name}")
 
-    files = list(dir_in.glob('*.h5'))
+    files = list(dir_in.glob("*.h5"))
     print(f"Cropping {len(files)} files in {dir_in}")
 
     Parallel(n_jobs=n_jobs, prefer="threads")(
-        delayed(process_file)(file_path)
-        for file_path in files
+        delayed(process_file)(file_path) for file_path in files
     )
 
     print(f"All crops saved in {out_dir}")
 
 
+def downsample_by_factor(arr, factor):
+    """Downsample a 3D array by an integer factor using simple slicing.
+
+    Args:
+        arr (np.ndarray): Input 3D array.
+        factor (int): Downsampling factor.
+
+    Returns:
+        np.ndarray: Downsampled array.
+    """
+    return arr[::factor, ::factor, ::factor]
+
+
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Crop raw and masked data around cluster centers")
-    parser.add_argument("--raw_path", type=str, required=False, help="Path to raw zarr dataset, the folder containing raw")
-    parser.add_argument("--masked_path", type=str, required=False, help="Path to masked zarr dataset, the folder containing masked_raw")
+    parser = argparse.ArgumentParser(
+        description="Crop raw and masked data around cluster centers"
+    )
+    parser.add_argument(
+        "--raw_path",
+        type=str,
+        required=False,
+        help="Path to raw zarr dataset, the folder containing raw",
+    )
+    parser.add_argument(
+        "--masked_path",
+        type=str,
+        required=False,
+        help="Path to masked zarr dataset, the folder containing masked_raw",
+    )
     parser.add_argument("--npz", type=str, required=False, help="Path to clusters npz")
-    parser.add_argument("--dir_in", type=str, help="Input directory for cropping all files in a folder", default=None)
-    parser.add_argument("--out_dir", type=str, required=True, help="Output directory for crops")
-    parser.add_argument("--n_jobs", type=int, default=4, help="Number of parallel workers")
-    parser.add_argument("--crop_um", type=float, default=1.92, required=True, help="Crop size in micrometers")
-    parser.add_argument("--top_clusters", type=int, default=None, help="If set, only process this many largest clusters")
-    parser.add_argument("--cluster_ids", type=int, nargs='*', default=None, help="If set, only process these cluster IDs")
-    parser.add_argument ("--min_points", type=int, default=500, help="Minimum points to consider a cluster")
-    parser.add_argument("--max_points", type=int, default=10000, help="Maximum points to consider a cluster")
+    parser.add_argument(
+        "--dir_in",
+        type=str,
+        help="Input directory for cropping all files in a folder",
+        default=None,
+    )
+    parser.add_argument(
+        "--out_dir", type=str, required=True, help="Output directory for crops"
+    )
+    parser.add_argument(
+        "--n_jobs", type=int, default=4, help="Number of parallel workers"
+    )
+    parser.add_argument(
+        "--crop_um",
+        type=float,
+        default=1.92,
+        required=True,
+        help="Crop size in micrometers",
+    )
+    parser.add_argument(
+        "--top_clusters",
+        type=int,
+        default=None,
+        help="If set, only process this many largest clusters",
+    )
+    parser.add_argument(
+        "--cluster_ids",
+        type=int,
+        nargs="*",
+        default=None,
+        help="If set, only process these cluster IDs",
+    )
+    parser.add_argument(
+        "--min_points",
+        type=int,
+        default=500,
+        help="Minimum points to consider a cluster",
+    )
+    parser.add_argument(
+        "--max_points",
+        type=int,
+        default=10000,
+        help="Maximum points to consider a cluster",
+    )
+    parser.add_argument(
+        "--downsample_factor",
+        type=int,
+        default=1,
+        help="If >1, downsample data by this integer factor",
+    )
 
     args = parser.parse_args()
 
     if args.dir_in is not None and os.path.isdir(args.dir_in):
         print("Cropping all files in directory:", args.dir_in)
-        crop_files(args.dir_in, args.out_dir, args.crop_um, args.n_jobs)
+        crop_files(
+            args.dir_in, args.out_dir, args.crop_um, args.n_jobs, args.downsample_factor
+        )
     elif args.npz is not None:
         print("Cropping clusters from npz:", args.npz)
         crop_clusters_parallel(
@@ -252,10 +356,13 @@ if __name__ == "__main__":
             cluster_ids=args.cluster_ids or None,
             min_points=args.min_points or None,
             max_points=args.max_points or None,
+            downsample_factor=args.downsample_factor,
         )
     else:
         # crop a single file, need to implement
-        print("Please provide a --npz file for cropping around clusters or a directory --dir_in to crop all files in a folder.")
+        print(
+            "Please provide a --npz file for cropping around clusters or a directory --dir_in to crop all files in a folder."
+        )
 
 # Usage example:
 #
@@ -277,8 +384,8 @@ if __name__ == "__main__":
 # --npz /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms60.npz \
 # --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_vesiclemasked \
 # --n_jobs 8 \
-# --min_points 2000 
-# 
+# --min_points 2000
+#
 # For cropping all files in a directory:
 #
 # python src/clustering/crop_clusters_parallel.py \

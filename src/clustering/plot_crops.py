@@ -3,6 +3,7 @@ import zarr
 import napari
 from collections import defaultdict
 
+
 def open_first_array(zarr_path):
     """Open a .zarr path and return the first array inside."""
     root = zarr.open(zarr_path, mode="r")
@@ -59,8 +60,12 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="View cluster crops in napari")
-    parser.add_argument("path", type=str, help="Path to cluster folder or parent directory")
-    parser.add_argument("--subset", type=int, default=None, help="If set, only view this many clusters")
+    parser.add_argument(
+        "path", type=str, help="Path to cluster folder or parent directory"
+    )
+    parser.add_argument(
+        "--subset", type=int, default=None, help="If set, only view this many clusters"
+    )
     args = parser.parse_args()
 
     view_clusters_in_napari(args.path, subset=args.subset)

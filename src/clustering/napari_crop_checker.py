@@ -1,5 +1,5 @@
-import napari 
-import numpy as np 
+import napari
+import numpy as np
 import pathlib
 from magicgui import magicgui
 import os
@@ -10,7 +10,7 @@ if __name__ == "__main__":
     # Load the napari viewer
     viewer = napari.Viewer()
 
-    #---- Helper Functions ----#
+    # ---- Helper Functions ----#
 
     class Rating(Enum):
         Good = 1
@@ -26,32 +26,36 @@ if __name__ == "__main__":
             return
 
         # === Create axis-swapped images ===
-        xy_view = layer
+        # xy view
+        layer
 
-        xz_view = viewer.add_image(
+        # xz view
+        viewer.add_image(
             layer.data.transpose(1, 0, 2),
             name=layer.name + "_XZ",
             contrast_limits=layer.contrast_limits,
             colormap=layer.colormap,
-            blending='additive'
+            blending="additive",
         )
 
-        yz_view = viewer.add_image(
+        # yz view
+        viewer.add_image(
             layer.data.transpose(2, 0, 1),
             name=layer.name + "_YZ",
             contrast_limits=layer.contrast_limits,
             colormap=layer.colormap,
-            blending='additive'
+            blending="additive",
         )
 
-        xy2_view = viewer.add_image(
+        # xy view 2 (different rendering)
+        viewer.add_image(
             layer.data,
             name=layer.name + "_XY2",
             contrast_limits=layer.contrast_limits,
             colormap=layer.colormap,
-            blending='additive',
-            rendering='attenuated_mip',
-            depiction='volume'
+            blending="additive",
+            rendering="attenuated_mip",
+            depiction="volume",
         )
 
         # === Put viewer into 4-panel grid ===
@@ -67,22 +71,24 @@ if __name__ == "__main__":
 
         print("4-panel orthogonal view ready.")
 
+    # ---- MagicGUI Widgets ----#
 
-    #---- MagicGUI Widgets ----#
-
-    @magicgui(call_button='Load Crop',
-              data_path={'label': 'Path to Crop (.h5)', "filter": "*.h5"}
+    @magicgui(
+        call_button="Load Crop",
+        data_path={"label": "Path to Crop (.h5)", "filter": "*.h5"},
     )
-    def load_crop(data_path = pathlib.Path('path/to/crop.h5')) -> napari.types.LayerDataTuple:
+    def load_crop(
+        data_path=pathlib.Path("path/to/crop.h5"),
+    ) -> napari.types.LayerDataTuple:
         """
-            Widget to allow the user to load in a crop that is to be assessed. The data
-            must be a TIF file, and the path to this file provided. This can either be entered
-            manually, or using the dictionary navigation button.
+        Widget to allow the user to load in a crop that is to be assessed. The data
+        must be a TIF file, and the path to this file provided. This can either be entered
+        manually, or using the dictionary navigation button.
 
-            Clicking the 'Load' call button will load the provided TIF file into a Napari image 
-            layer with the name 'raw'.
+        Clicking the 'Load' call button will load the provided TIF file into a Napari image
+        layer with the name 'raw'.
         """
-        f = h5py.File(data_path, 'r')
+        f = h5py.File(data_path, "r")
         dset_name = data_path.stem  # try dataset name as file name without extension
         if dset_name in f:
             dat = f[dset_name][:]
@@ -93,29 +99,35 @@ if __name__ == "__main__":
         f.close()
         center = np.array(dat.shape) / 2
         points = np.array([center])
-        viewer.add_points(
-            points,
-            name="center marker",
-            size=10,
-            face_color="red"
-            ) 
-        masked = viewer.add_image(data=dat, name=dset_name, blending='additive', colormap='grey', contrast_limits=[dat.min(), dat.max()])
+        viewer.add_points(points, name="center marker", size=10, face_color="red")
+        masked = viewer.add_image(
+            data=dat,
+            name=dset_name,
+            blending="additive",
+            colormap="grey",
+            contrast_limits=[dat.min(), dat.max()],
+        )
         setup_four_panel_view(viewer, masked)
 
-    @magicgui(call_button='Load Comparison Crop',
-              raw_data_path={'label': 'Path to Crop (.h5)', "filter": "*.h5"}
+    @magicgui(
+        call_button="Load Comparison Crop",
+        raw_data_path={"label": "Path to Crop (.h5)", "filter": "*.h5"},
     )
-    def load_raw(raw_data_path = pathlib.Path('path/to/raw.h5')) -> napari.types.LayerDataTuple:
+    def load_raw(
+        raw_data_path=pathlib.Path("path/to/raw.h5"),
+    ) -> napari.types.LayerDataTuple:
         """
-            Widget to allow the user to load in a crop that is to be assessed. The data
-            must be a TIF file, and the path to this file provided. This can either be entered
-            manually, or using the dictionary navigation button.
+        Widget to allow the user to load in a crop that is to be assessed. The data
+        must be a TIF file, and the path to this file provided. This can either be entered
+        manually, or using the dictionary navigation button.
 
-            Clicking the 'Load' call button will load the provided TIF file into a Napari image 
-            layer with the name 'raw'.
+        Clicking the 'Load' call button will load the provided TIF file into a Napari image
+        layer with the name 'raw'.
         """
-        f = h5py.File(raw_data_path, 'r')
-        dset_name = raw_data_path.stem  # try dataset name as file name without extension
+        f = h5py.File(raw_data_path, "r")
+        dset_name = (
+            raw_data_path.stem
+        )  # try dataset name as file name without extension
         if dset_name in f:
             dat = f[dset_name][:]
         else:
@@ -123,35 +135,39 @@ if __name__ == "__main__":
             first_key = list(f.keys())[0]
             dat = f[first_key][:]
         f.close()
-        raw = viewer.add_image(data=dat, name=dset_name, blending='additive', colormap='grey', contrast_limits=[dat.min(), dat.max()])
+        raw = viewer.add_image(
+            data=dat,
+            name=dset_name,
+            blending="additive",
+            colormap="grey",
+            contrast_limits=[dat.min(), dat.max()],
+        )
         setup_four_panel_view(viewer, raw)
 
-    @magicgui(call_button='Rate Crop')
-    def rate_crop(rating = Rating.Unsure, notes = str("")) -> None:
+    @magicgui(call_button="Rate Crop")
+    def rate_crop(rating=Rating.Unsure, notes=str("")) -> None:
         """
-            Widget to allow the user to rate the currently loaded crop. The rating is an integer
-            value that can be set using the spin box. 
+        Widget to allow the user to rate the currently loaded crop. The rating is an integer
+        value that can be set using the spin box.
 
-            Clicking the 'Rate Crop' call button will print the rating to a csv file alongside the
-            masked crop path.
+        Clicking the 'Rate Crop' call button will print the rating to a csv file alongside the
+        masked crop path.
         """
         # Check for existing ratings file, if not present create it
         print(f"Crop rated as: {rating}")
-        if not os.path.exists('crop_ratings.csv'):
-            with open('crop_ratings.csv', 'w') as f:
+        if not os.path.exists("crop_ratings.csv"):
+            with open("crop_ratings.csv", "w") as f:
                 f.write("masked_crop_path,rating,notes\n")
         # Check for any commas in the notes and replace with semicolon to avoid csv issues
-        notes = notes.replace(',', ';')
+        notes = notes.replace(",", ";")
         # Append the new rating to the file
-        with open('crop_ratings.csv', 'a') as f:
+        with open("crop_ratings.csv", "a") as f:
             layer = viewer.layers.selection.active
             if layer is not None:
                 f.write(f"{layer.name},{rating},{notes}\n")
-        
 
-    viewer.window.add_dock_widget(load_crop, area='right')
-    viewer.window.add_dock_widget(load_raw, area='right')
-    viewer.window.add_dock_widget(rate_crop, area='right')
-
+    viewer.window.add_dock_widget(load_crop, area="right")
+    viewer.window.add_dock_widget(load_raw, area="right")
+    viewer.window.add_dock_widget(rate_crop, area="right")
 
     napari.run()

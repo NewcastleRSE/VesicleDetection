@@ -2,8 +2,8 @@ import csv
 import re
 import os
 
-CSV_PATH = "counts_clusters6_60_filtered.csv"        # path to your csv
-FOLDER = "/Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_allmasked/raw"        # folder with cluster_XX_raw.h5 files
+CSV_PATH = "counts_clusters6_60_filtered.csv"  # path to your csv
+FOLDER = "/Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_allmasked/raw"  # folder with cluster_XX_raw.h5 files
 
 # --- Read cluster numbers from CSV ---
 csv_clusters = set()
@@ -37,7 +37,10 @@ print(f"Clusters only in filenames ({len(only_files)}): {sorted(only_files)}")
 
 # --- export new CSV with only matching clusters ---
 OUTPUT_CSV_PATH = "counts_clusters6_60_filtered_matched.csv"
-with open(CSV_PATH, newline="") as infile, open(OUTPUT_CSV_PATH, "w", newline="") as outfile:
+with (
+    open(CSV_PATH, newline="") as infile,
+    open(OUTPUT_CSV_PATH, "w", newline="") as outfile,
+):
     reader = csv.DictReader(infile)
     writer = csv.DictWriter(outfile, fieldnames=reader.fieldnames)
     writer.writeheader()
