@@ -2,7 +2,6 @@ import csv
 import re
 import os
 
-
 def cluster_count_checker(csv_path, folder, corrected_output_path, output_corrected=False):
     # --- Read cluster numbers from CSV ---
     csv_clusters = set()
@@ -35,6 +34,7 @@ def cluster_count_checker(csv_path, folder, corrected_output_path, output_correc
 
     if output_corrected:
         # --- export new CSV with only matching clusters ---
+        print(f"Writing corrected CSV to {corrected_output_path}...")
         with (
             open(csv_path, newline="") as infile,
             open(corrected_output_path, "w", newline="") as outfile,

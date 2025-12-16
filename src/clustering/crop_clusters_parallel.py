@@ -105,14 +105,14 @@ def crop_arr(center, shape, arr, out_path, name, downsample_factor=1):
 
     crop = arr[indexes]
 
-    if downsample_factor > 1:
-        crop = downsample_by_factor(crop, downsample_factor)
-
     # Sanity check — ensure cubic shape
     if np.any([crop.shape[d] != shape[d] for d in range(0, arr.ndim, 1)]):
         raise ValueError(
             "For any dimension d, crop.shape[d] must be equal to shape[d]."
         )
+    
+    if downsample_factor > 1:
+        crop = downsample_by_factor(crop, downsample_factor)
 
     f = h5py.File(out_path, "w")
     f.create_dataset(
@@ -210,17 +210,17 @@ def crop_clusters_parallel(
 
     print(f"All crops saved in {out_dir}")
 
-    if make_labels == True:
+    if make_labels:
         # Save cluster counts for reference
         csv_out = os.path.join(out_dir, "counts_clusters.csv")
         count_positive_per_cluster(
             npz_path,
-            masked_path,
+            os.path.join(raw_path,"Predictions/31_07_2025/Hough_transformed"),
             csv_out,
             chunk_size=1_000_000,
             min_size=min_points,
             max_size=max_points,
-            use_filenames=True,
+            use_filenames=False,
         )
 
     cluster_count_checker(
@@ -397,25 +397,17 @@ if __name__ == "__main__":
 
 # Usage example:
 #
-# python crop_clusters.py \
-#   --raw_path data/raw.zarr \
-#   --masked_path data/masked.zarr \
-#   --npz clusters.npz \
-#   --out_dir crops_filtered \
-#   --min_points 200 \
-#   --max_points 2000 \
-#   --n_jobs 8
-#
-#
-# or:
-#
 # python src/clustering/crop_clusters_parallel.py \
 # --raw_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/ \
 # --masked_path /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm.zarr/predict/vesicle_masked_dilation1 \
 # --npz /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/clusters/clusters_1913sbv_eps6ms60.npz \
-# --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_vesiclemasked \
+# --out_dir /Users/administrator/Documents/CorrelatingNeuronalActivity/VesicleDetection/data/19-13_subvolume_0647-1670_6x6x6nm_cluster_crops_vesiclemasked_downsampled \
 # --n_jobs 8 \
-# --min_points 2000
+# --min_points 2000 \
+# --crop_um 1.536 \
+# --make_labels \
+# --downsample_factor 3
+#  
 #
 # For cropping all files in a directory:
 #
