@@ -1,6 +1,8 @@
+
 import napari
 import zarr
 import sys
+
 
 def imshow_napari_validation(data_path, prediction_path):
     """
@@ -10,7 +12,7 @@ def imshow_napari_validation(data_path, prediction_path):
 
         As the UNet crops the output image compared to the input image, the prediction
         will be smaller than the raw validation image and hand labelled ground truth. 
-        The prediction will be shown in context of the whole image, and so the user should
+        The prediction will be shown in the context of the whole image, and so the user should
         expect a border that contains no prediction. 
 
         Parameters 
@@ -62,10 +64,10 @@ def imshow_napari_prediction(data_path, prediction_path):
         Parameters
         -------------------
         data_path (str):
-            Path to the zarr group containing the 'predict' zarr group. The predict zarr group
+            Path to the zarr group containing the 'predict' zarr group. The predicted zarr group
             should itself contain the 'raw' zarr array, corresponding to the raw data. 
         prediction_path (str):
-            Path to the zarr group containing the predicition. This zarr group should contain 
+            Path to the zarr group containing the prediction. This zarr group should contain
             a zarr array called 'Hough_transformed' inside it, corresponding to the post-processed 
             prediction. 
     """
