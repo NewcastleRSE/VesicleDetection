@@ -81,6 +81,15 @@ def Apply(zarr_path: str, model_checkpoint: str):
     for atr in data.raw_data.attrs:
         f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
     
+    # save candidate location and labels to a csv file
+    candidates_save_path = f"{save_path}/candidates.csv"
+    with open(candidates_save_path, mode='w', newline='') as file:
+        file.write("x,y,z,score,label\n")
+        for candidate in candidates:
+            x, y, z = candidate.location
+            label = candidate.label
+            file.write(f"{x},{y},{z},{label}\n")
+
     return candidates, save_path
 
 if __name__ == "__main__":
