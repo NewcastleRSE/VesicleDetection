@@ -1,10 +1,12 @@
 import napari 
 import numpy as np 
 import pathlib
-from magicgui import magicgui
+from magicgui import magicgui, widgets
 import os
 from enum import Enum
 import h5py
+import glob
+import pandas as pd
 
 if __name__ == "__main__":
     # Load the napari viewer
@@ -16,6 +18,16 @@ if __name__ == "__main__":
         Good = 1
         Bad = 0
         Unsure = -1
+
+    class FolderState:
+        def __init__(self):
+            self.root_path = None
+            self.crop_ids = []
+            self.current_idx = 0
+            self.csv_path = None
+            self.df = None # This will hold our ratings table
+
+    state = FolderState()
 
     def setup_four_panel_view(viewer, layer):
         """Create a 4-panel orthogonal viewer layout for the given image layer."""
@@ -68,7 +80,119 @@ if __name__ == "__main__":
         print("4-panel orthogonal view ready.")
 
 
+    def load_pair(masked_path, raw_path):
+        """Helper to clear viewer and load the specific h5 pair."""
+        viewer.layers.clear()
+        
+        # Load Masked
+        with h5py.File(masked_path, 'r') as f:
+            dset = list(f.keys())[0]
+            masked_data = f[dset][:]
+        
+        # Load Raw
+        with h5py.File(raw_path, 'r') as f:
+            dset = list(f.keys())[0]
+            raw_data = f[dset][:]
+
+        # Add to viewer
+        # m_layer = viewer.add_image(masked_data, name=f"Masked_{masked_path.stem}", colormap='green', blending='additive')
+        # r_layer = viewer.add_image(raw_data, name=f"Raw_{raw_path.stem}", colormap='grey', blending='additive')
+        
+        # # Add center marker
+        # center = np.array(masked_data.shape) / 2
+        # viewer.add_points([center], name="center marker", size=10, face_color="red")
+        
+        # # Trigger your 4-panel view
+        # setup_four_panel_view(viewer, m_layer)
+        # setup_four_panel_view(viewer, r_layer)
+        load_crop(masked_path)
+        load_raw(raw_path)
+
     #---- MagicGUI Widgets ----#
+
+    @magicgui(
+            call_button="Initialize Folder",
+            folder_path={"label": "Select Folder", "mode": "d"},
+        )
+    def folder_navigator(folder_path=pathlib.Path.cwd()):
+        """Finds all clusters and prepares the list."""
+        state.root_path = folder_path
+        masked_dir = folder_path / "masked"
+        
+        # Find all files matching the pattern and extract IDs
+        files = glob.glob(str(masked_dir / "cluster_*_masked.h5"))
+        # Sort numerically by extracting the number from the filename
+        state.crop_ids = sorted([os.path.basename(f).split('_')[1] for f in files], key=int)
+        state.current_idx = 0
+
+        folder_name = os.path.basename(folder_path)
+        state.csv_path = folder_path / f"{folder_name}_ratings.csv"
+
+        if os.path.exists(state.csv_path):
+            state.df = pd.read_csv(state.csv_path)
+            # Convert ID column to string to ensure matching works
+            state.df['id'] = state.df['id'].astype(str)
+            data = {
+                "id": state.df['id'],
+                "rating": state.df['rating'],
+                "notes": state.df['notes'],
+                "masked_path": state.df['masked_path']
+            }
+        else:
+            # Create a fresh table with all IDs pre-populated
+            data = {
+                "id": state.crop_ids,
+                "rating": ["Unsure"] * len(state.crop_ids),
+                "notes": [""] * len(state.crop_ids),
+                "masked_path": [f"masked/cluster_{cid}_masked.h5" for cid in state.crop_ids]
+            }
+        state.df = pd.DataFrame(data)
+        state.df.to_csv(state.csv_path, index=False)
+        
+        if state.crop_ids:
+            show_current_crop()
+        else:
+            print("No matching crops found in folder!")
+
+
+    def show_current_crop():
+            cid = state.crop_ids[state.current_idx]
+            m_path = state.root_path / "masked" / f"cluster_{cid}_masked.h5"
+            r_path = state.root_path / "raw" / f"cluster_{cid}_raw.h5"
+            
+            if m_path.exists() and r_path.exists():
+                load_pair(m_path, r_path)
+                # Update the label on our custom button container
+                status_label.value = f"Crop {state.current_idx + 1} of {len(state.crop_ids)} (ID: {cid})"
+            else:
+                print(f"Missing one of the pair for ID {cid}")
+
+
+    # --- Create Next/Prev Buttons ---
+    @magicgui(call_button="Next Crop >>")
+    def next_crop():
+        if state.current_idx < len(state.crop_ids) - 1:
+            state.current_idx += 1
+            show_current_crop()
+
+    @magicgui(call_button="<< Prev Crop")
+    def prev_crop():
+        if state.current_idx > 0:
+            state.current_idx -= 1
+            show_current_crop()
+
+    # Create a container to hold the navigation status
+    status_label = widgets.Label(value="No folder loaded")
+
+    next_prev_widget = widgets.Container(
+        widgets=[
+            prev_crop, 
+            next_crop, 
+            status_label # Use the variable here
+        ],
+        layout="horizontal",
+        labels=False
+    )
 
     @magicgui(call_button='Load Crop',
               data_path={'label': 'Path to Crop (.h5)', "filter": "*.h5"}
@@ -126,7 +250,8 @@ if __name__ == "__main__":
         raw = viewer.add_image(data=dat, name=dset_name, blending='additive', colormap='grey', contrast_limits=[dat.min(), dat.max()])
         setup_four_panel_view(viewer, raw)
 
-    @magicgui(call_button='Rate Crop')
+    @magicgui(call_button='Save Rating',
+              notes={"label": "Notes:"})
     def rate_crop(rating = Rating.Unsure, notes = str("")) -> None:
         """
             Widget to allow the user to rate the currently loaded crop. The rating is an integer
@@ -135,23 +260,32 @@ if __name__ == "__main__":
             Clicking the 'Rate Crop' call button will print the rating to a csv file alongside the
             masked crop path.
         """
-        # Check for existing ratings file, if not present create it
-        print(f"Crop rated as: {rating}")
-        if not os.path.exists('crop_ratings.csv'):
-            with open('crop_ratings.csv', 'w') as f:
-                f.write("masked_crop_path,rating,notes\n")
-        # Check for any commas in the notes and replace with semicolon to avoid csv issues
-        notes = notes.replace(',', ';')
-        # Append the new rating to the file
-        with open('crop_ratings.csv', 'a') as f:
-            layer = viewer.layers.selection.active
-            if layer is not None:
-                f.write(f"{layer.name},{rating},{notes}\n")
+        if state.df is None:
+            print("No folder loaded, cannot save rating!")
+            return
         
+        current_id = str(state.crop_ids[state.current_idx])
+    
+        # Update the local DataFrame (find row where 'id' matches)
+        state.df.loc[state.df['id'] == current_id, 'rating'] = rating.name
+        state.df.loc[state.df['id'] == current_id, 'notes'] = notes.replace(',', ';')
+        
+        # Save the whole thing back to CSV
+        state.df.to_csv(state.csv_path, index=False)
+        
+        print(f"Updated ID {current_id} with {rating.name}")
+        
+        # Optional: Automatically move to next after rating
+        next_crop()
 
-    viewer.window.add_dock_widget(load_crop, area='right')
-    viewer.window.add_dock_widget(load_raw, area='right')
-    viewer.window.add_dock_widget(rate_crop, area='right')
 
+    
+    #viewer.window.add_dock_widget(load_crop, area='right')    
+    #viewer.window.add_dock_widget(load_raw, area='right')
+
+    viewer.window.add_dock_widget(folder_navigator, area='right', name="1. Setup")
+    viewer.window.add_dock_widget(next_prev_widget, area='right', name="2. Navigation")
+    viewer.window.add_dock_widget(load_crop, area='right', name="Optional: Load Individual Crop")
+    viewer.window.add_dock_widget(rate_crop, area='right', name="3. Scoring")
 
     napari.run()
