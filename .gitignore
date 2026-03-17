@@ -177,3 +177,7 @@ Model_checkpoints/
 
 saved_models/
 /predicted_labels
+
+# macOS
+.DS_Store
+
