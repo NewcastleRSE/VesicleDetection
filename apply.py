@@ -1,6 +1,7 @@
 
 import argparse
 import os
+import sys
 from datetime import datetime
 import json
 import numpy as np
@@ -114,7 +115,7 @@ class Apply:
         return None
 
     def predict_labels(
-            self, data, bias=1.0,
+            self, data, bias=1.0, do_draw_ball=True,
             do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None,
             do_save_multi_label_tiff=False, filename_of_multi_label_tiff=None,
             do_save_single_label_tiffs=False,
@@ -131,6 +132,10 @@ class Apply:
           maxima_pos is less than bias[b] * maxima_neg. Otherwise, it labels it as PC+. So, bias greater than 1
           favour PC- labelling while bias less than 1 favour PC+.
         :type bias: int | float | list | tuple | None
+
+        :param do_draw_ball: If True, it will put the labels in all voxels belonging to the detected vesicles. If False, it
+          will only put the labels in the voxel centres of the detected vesicles. Default is True.
+        :type do_draw_ball: bool
 
         :param do_save_multi_label_tiff: If True, it saves all predicted labels in one tiff file. The default
           is False.
@@ -204,7 +209,8 @@ class Apply:
         for b in range(0, n_biases, 1):
 
             labels[b], candidates[b] = self.hough_detection(
-                probs=probs, voxel_size=data_voxel_size, bias=bias[b], dtype_labels=dtype_labels)
+                probs=probs, voxel_size=data_voxel_size, bias=bias[b], do_draw_ball=do_draw_ball,
+                dtype_labels=dtype_labels)
 
             self.save_labels(
                 labels=labels[b],
@@ -226,7 +232,7 @@ class Apply:
                     None if (not do_save_single_label_tiffs) or (filenames_of_single_label_tiffs is None)
                     else filenames_of_single_label_tiffs[b]),
 
-                bias=bias[b])
+                bias=bias[b], do_draw_ball=do_draw_ball)
 
             if do_show:
                 viewer.append_labels(labels=labels[b], name=f'labels_with_bias_{bias[b]:0.3f}', opacity=0.4)
@@ -275,7 +281,7 @@ class Apply:
 
         return probs
 
-    def hough_detection(self, probs, voxel_size, bias=1.0, dtype_labels=None):
+    def hough_detection(self, probs, voxel_size, bias=1.0, do_draw_ball=True, dtype_labels=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -289,6 +295,10 @@ class Apply:
           maxima_pos is less than bias * maxima_neg. Otherwise, it labels it as PC+. So, a bias greater than 1 favours
           PC- labelling while a bias less than 1 favours PC+.
         :type bias: int | float | None
+
+        :param do_draw_ball: If True, it will put the labels in all voxels belonging to the detected vesicles. If False, it
+          will only put the labels in the voxel centres of the detected vesicles. Default is True.
+        :type do_draw_ball: bool
 
         :param dtype_labels: Optional numpy data type of the predicted labels. If it is None (Default), numpy will
           decide it (usually int64).
@@ -324,6 +334,11 @@ class Apply:
         else:
             raise TypeError("bias must be an int, a float or None")
 
+        if isinstance(do_draw_ball, bool):
+            pass
+        else:
+            raise TypeError("do_draw_ball must be a bool")
+
         pos_pred_data = probs[1, :, :, :]
         neg_pred_data = probs[2, :, :, :]
 
@@ -332,7 +347,9 @@ class Apply:
             pred_pos=pos_pred_data,
             pred_neg=neg_pred_data,
             voxel_size=voxel_size,
-            bias=bias)
+            bias=bias,
+            do_draw_ball=do_draw_ball
+        )
 
         hough_detection.process()
         hough_pred = hough_detection.prediction_result
@@ -350,7 +367,7 @@ class Apply:
             do_save_multi_label_zarr=True, dirname_of_multi_label_zarr=None, raw_data_attrs=None,
             do_save_multi_label_tiff=False, filename_of_multi_label_tiff=None,
             do_save_single_label_tiffs=False, filenames_of_single_label_tiffs=None,
-            bias=None):
+            bias=None, do_draw_ball=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -378,23 +395,26 @@ class Apply:
 
         if do_save_multi_label_zarr:
             self.save_multi_label_zarr(
-                labels=labels, dirname_zarr=dirname_of_multi_label_zarr, raw_data_attrs=raw_data_attrs, bias=bias)
+                labels=labels, dirname_zarr=dirname_of_multi_label_zarr, raw_data_attrs=raw_data_attrs, bias=bias,
+                do_draw_ball=do_draw_ball)
 
         if isinstance(do_save_multi_label_tiff, bool):
             if do_save_multi_label_tiff:
-                self.save_multi_label_tiff(labels=labels, filename=filename_of_multi_label_tiff, bias=bias)
+                self.save_multi_label_tiff(
+                    labels=labels, filename=filename_of_multi_label_tiff, bias=bias, do_draw_ball=do_draw_ball)
         else:
             raise TypeError('do_save_multi_label_tiff must be a bool')
 
         if isinstance(do_save_single_label_tiffs, bool):
             if do_save_single_label_tiffs:
-                self.save_single_label_tiffs(labels=labels, filenames=filenames_of_single_label_tiffs, bias=bias)
+                self.save_single_label_tiffs(
+                    labels=labels, filenames=filenames_of_single_label_tiffs, bias=bias, do_draw_ball=do_draw_ball)
         else:
             raise TypeError('do_save_single_label_tiffs must be a bool')
 
         return None
 
-    def save_multi_label_zarr(self, labels, dirname_zarr, raw_data_attrs, bias=None):
+    def save_multi_label_zarr(self, labels, dirname_zarr, raw_data_attrs, bias=None, do_draw_ball=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -422,14 +442,24 @@ class Apply:
 
         # Create save location
 
-        save_path = os.path.join(dirname_zarr, 'predict', 'Predictions')
+        save_path = os.path.join(dirname_zarr, 'predict', 'Predictions', 'date_{date:s}'.format(date=date))
+
+        if do_draw_ball is None:
+            pass
+        elif isinstance(do_draw_ball, bool):
+            if do_draw_ball:
+                save_path = save_path + '_balls'
+            else:
+                save_path = save_path + '_centres'
+        else:
+            raise TypeError('do_draw_bal must be a bool or None')
 
         if bias is None:
-            save_path = os.path.join(save_path, 'date_{date:s}'.format(date=date))
+            pass
         elif isinstance(bias, (int, float)):
-            save_path = os.path.join(save_path, 'bias_{bias:0.3f}_date_{date:s}'.format(bias=bias, date=date))
+            save_path = save_path + '_bias_{bias:0.3f}'.format(bias=bias)
         else:
-            raise TypeError('bias must be an int or None')
+            raise TypeError('bias must be an int, float or None')
 
         save_path = create_unique_directory_file(save_path)
 
@@ -444,7 +474,7 @@ class Apply:
 
         return None
 
-    def save_multi_label_tiff(self, labels, filename=None, bias=None):
+    def save_multi_label_tiff(self, labels, filename=None, bias=None, do_draw_ball=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -467,6 +497,17 @@ class Apply:
 
         if filename is None:
             dirname = os.path.join('predicted_labels', 'tiffs')
+
+            if do_draw_ball is None:
+                pass
+            elif isinstance(do_draw_ball, bool):
+                if do_draw_ball:
+                    dirname = os.path.join(dirname, 'balls')
+                else:
+                    dirname = os.path.join(dirname, 'centres')
+            else:
+                raise TypeError('do_draw_bal must be a bool or None')
+
             if bias is None:
                 pass
             elif isinstance(bias, (int, float)):
@@ -489,7 +530,7 @@ class Apply:
 
         return None
 
-    def save_single_label_tiffs(self, labels, filenames=None, bias=None):
+    def save_single_label_tiffs(self, labels, filenames=None, bias=None, do_draw_ball=None):
 
         """Use a pretrained vesicle detection model to predict vesicles in unlabelled data by using a single bias.
 
@@ -529,6 +570,17 @@ class Apply:
         if filenames is None:
 
             dirname = os.path.join('predicted_labels', 'tiffs')
+
+            if do_draw_ball is None:
+                pass
+            elif isinstance(do_draw_ball, bool):
+                if do_draw_ball:
+                    dirname = os.path.join(dirname, 'balls')
+                else:
+                    dirname = os.path.join(dirname, 'centres')
+            else:
+                raise TypeError('do_draw_bal must be a bool or None')
+
             if bias is None:
                 pass
             elif isinstance(bias, (int, float)):
@@ -564,89 +616,145 @@ class Apply:
 
 if __name__ == "__main__":
 
-    parser = argparse.ArgumentParser(
-        prog=None, usage=None, description=None, epilog=None, parents=[],
-        formatter_class=argparse.HelpFormatter, prefix_chars='-', fromfile_prefix_chars=None,
-        argument_default=None, conflict_handler='error', add_help=True, allow_abbrev=True,
-        exit_on_error=True)
+    n_argvs = len(sys.argv)
+    if n_argvs == 1:
+        print('Debugging')
 
-    parser.add_argument(
-        'dirname_data', action='store', type=str, help='The directory path of the zarr raw data.')
+        dirname_data = '/home/campus.ncl.ac.uk/ncc222/Projects/neuroscience/data/crops/crop_0001'
 
-    parser.add_argument(
-        'filename_model', action='store', type=str, help='The file path of the trained model.')
+        filename_model = '/home/campus.ncl.ac.uk/ncc222/Projects/neuroscience/saved_models/20_05_2025/model_checkpoints/fscore_average'
 
-    parser.add_argument(
-        '-b', '--background', action='store', default=0, type=int, required=False,
-        help='The background label that the model was trained with. Default is 0.')
+        background = 0
+        bias = 5
+        do_draw_ball = False
 
-    parser.add_argument(
-        '-B', '--bias', action='store', default=1.0, type=str, required=False,
-        help=(
-            'A factor biasing the labelling of vesicle candidates. '
-            'A vesicle candidate is labelled as PC- if maxima_pos is less than bias * maxima_neg. Otherwise, it is '
-            'labelled as PC+. So, a bias greater than 1 favours PC- labelling while a bias less than 1 favours PC+. '
-            'The bias can either be an int, a float or a list of ints and floats in the form '
-            '"[bias_1, bias_2, ..., bias_n]". For instance, it could be "3", "3.752" or "[2, 3.174, 4.7]".')
-    )
+        save_multi_label_zarr = False
+        dirname_of_multi_label_zarr = None
 
-    parser.add_argument(
-        '-z', '--save_multi_label_zarr', action='store_true', required=False,
-        help='If in the arguments, save all labels in one zarr container.')
+        save_multi_label_tiff = False
+        filename_of_multi_label_tiff = None
 
-    parser.add_argument(
-        '-Z', '--dirname_of_multi_label_zarr', action='store', default=None, type=str,
-        help='The directory path of the multi-label zarr container.')
+        save_single_label_tiffs = True
+        filenames_of_single_label_tiffs = None
 
-    parser.add_argument(
-        '-m', '--save_multi_label_tiff', action='store_true', required=False,
-        help='If in the arguments, save all labels in one tiff file.')
+        dtype = 'uint8'
 
-    parser.add_argument(
-        '-M', '--filename_of_multi_label_tiff', action='store', default=None, type=str,
-        help='The file path of the multi-label tiff file.')
+        visualise = True
+
+    else:
+
+        parser = argparse.ArgumentParser(
+            prog=None, usage=None, description=None, epilog=None, parents=[],
+            formatter_class=argparse.HelpFormatter, prefix_chars='-', fromfile_prefix_chars=None,
+            argument_default=None, conflict_handler='error', add_help=True, allow_abbrev=True,
+            exit_on_error=True)
+
+        parser.add_argument(
+            'dirname_data', action='store', type=str, help='The directory path of the zarr raw data.')
+
+        parser.add_argument(
+            'filename_model', action='store', type=str, help='The file path of the trained model.')
+
+        parser.add_argument(
+            '-b', '--background', action='store', default=0, type=int, required=False,
+            help='The background label that the model was trained with. Default is 0.')
+
+        parser.add_argument(
+            '-B', '--bias', action='store', default=1.0, type=str, required=False,
+            help=(
+                'A factor biasing the labelling of vesicle candidates. '
+                'A vesicle candidate is labelled as PC- if maxima_pos is less than bias * maxima_neg. Otherwise, it is '
+                'labelled as PC+. So, a bias greater than 1 favours PC- labelling while a bias less than 1 favours PC+. '
+                'The bias can either be an int, a float or a list of ints and floats in the form '
+                '"[bias_1, bias_2, ..., bias_n]". For instance, it could be "3", "3.752" or "[2, 3.174, 4.7]".')
+        )
+
+        parser.add_argument(
+            '-d', '--do_draw_ball', action='store_true', type=bool, required=False,
+            help=(
+                'If in the arguments, it will put the labels in all voxels belonging to the detected vesicles.'
+                'Otherwise, it will only put the labels in the voxel centres of the detected vesicles.'))
+
+        parser.add_argument(
+            '-z', '--save_multi_label_zarr', action='store_true', type=bool, required=False,
+            help='If in the arguments, save all labels in one zarr container.')
+
+        parser.add_argument(
+            '-Z', '--dirname_of_multi_label_zarr', action='store', default=None, type=str,
+            help='The directory path of the multi-label zarr container.')
+
+        parser.add_argument(
+            '-m', '--save_multi_label_tiff', action='store_true', type=bool, required=False,
+            help='If in the arguments, save all labels in one tiff file.')
+
+        parser.add_argument(
+            '-M', '--filename_of_multi_label_tiff', action='store', default=None, type=str,
+            help='The file path of the multi-label tiff file.')
 
 
-    parser.add_argument(
-        '-s', '--save_single_label_tiffs', action='store_true', required=False,
-        help='If in the arguments, save different labels in different tiff files.')
+        parser.add_argument(
+            '-s', '--save_single_label_tiffs', action='store_true', type=bool, required=False,
+            help='If in the arguments, save different labels in different tiff files.')
 
-    parser.add_argument(
-        '-S', '--filenames_of_single_label_tiffs', action='store', default=None, type=str,
-        help=(
-            r'The file paths of the single-label tiff files with format '
-            r'"[\"filename_0\", \"filename_1\", ..., \"filename_n\"]".')
-    )
+        parser.add_argument(
+            '-S', '--filenames_of_single_label_tiffs', action='store', default=None, type=str,
+            help=(
+                r'The file paths of the single-label tiff files with format '
+                r'"[\"filename_0\", \"filename_1\", ..., \"filename_n\"]".')
+        )
 
-    parser.add_argument(
-        '-t', '--dtype', action='store', default=None, type=str, required=False,
-        help='The numpy array data type of the labels. It accepts "int8", "int16", "int32" and "int64".')
+        parser.add_argument(
+            '-t', '--dtype', action='store', default=None, type=str, required=False,
+            help='The numpy array data type of the labels. It accepts "int8", "int16", "int32" and "int64".')
 
-    parser.add_argument(
-        '-v', '--visualise', action='store_true', required=False,
-        help='If in the arguments, visualise the predicted results.')
+        parser.add_argument(
+            '-v', '--visualise', action='store_true', type=bool, required=False,
+            help='If in the arguments, visualise the predicted results.')
 
 
 
-    args = parser.parse_args()
+        args = parser.parse_args()
 
-    args.bias = json.loads(args.bias)
 
-    apply = Apply(filename_model=args.filename_model, label_background=args.background)
+        dirname_data = args.dirname_data
+        filename_model = args.filename_model
 
-    data = EMData(args.dirname_data, 'predict', clahe=TRAINING_CONFIG.clahe)
+        background = args.background
+        bias = args.bias
+
+        do_draw_ball = args.do_draw_ball
+
+        save_multi_label_zarr = args.save_multi_label_zarr
+        dirname_of_multi_label_zarr = args.dirname_of_multi_label_zarr
+
+        save_multi_label_tiff = args.save_multi_label_tiff
+        filename_of_multi_label_tiff = args.filename_of_multi_label_tiff
+
+        save_single_label_tiffs = args.save_single_label_tiffs
+        filenames_of_single_label_tiffs = args.filenames_of_single_label_tiffs
+
+        dtype = args.dtype
+
+        visualise = args.visualise
+
+    if isinstance(bias, str):
+        bias = json.loads(bias)
+
+    apply = Apply(filename_model=filename_model, label_background=background)
+
+    data = EMData(dirname_data, 'predict', clahe=TRAINING_CONFIG.clahe)
 
     probs, labels, candidates = apply(
-        data=data, bias=args.bias,
-        do_save_multi_label_zarr=args.save_multi_label_zarr,
-        dirname_of_multi_label_zarr=args.dirname_of_multi_label_zarr,
-        do_save_multi_label_tiff=args.save_multi_label_tiff,
-        filename_of_multi_label_tiff=args.filename_of_multi_label_tiff,
-        do_save_single_label_tiffs=args.save_single_label_tiffs,
-        filenames_of_single_label_tiffs=args.filenames_of_single_label_tiffs,
-        dtype_labels=args.dtype, do_show=args.visualise)
+        data=data, bias=bias, do_draw_ball=do_draw_ball,
+        do_save_multi_label_zarr=save_multi_label_zarr,
+        dirname_of_multi_label_zarr=dirname_of_multi_label_zarr,
+        do_save_multi_label_tiff=save_multi_label_tiff,
+        filename_of_multi_label_tiff=filename_of_multi_label_tiff,
+        do_save_single_label_tiffs=save_single_label_tiffs,
+        filenames_of_single_label_tiffs=filenames_of_single_label_tiffs,
+        dtype_labels=dtype, do_show=visualise)
 
-    for b in range(0, len(args.bias), 1):
+    for b in range(0, len(bias), 1):
         pos_labels = 0
         neg_labels = 0
         for candidate in candidates[b]:
@@ -656,7 +764,7 @@ if __name__ == "__main__":
                 neg_labels +=1 
 
         print('    '.join([
-            f"bias: {args.bias[b]:0.3f}",
+            f"bias: {bias[b]:0.3f}",
             f"PC+ predictions: {pos_labels: >9d}",
             f"PC- predictions: {neg_labels: >9d}"]))
 
