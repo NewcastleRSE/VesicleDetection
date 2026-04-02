@@ -2,7 +2,7 @@
 import argparse
 import os
 import json
-import skimage.io 
+import skimage.io
 
 
 
@@ -88,12 +88,12 @@ if __name__ == "__main__":
         help='The JSON filename with the index ranges used to crop the image. Default is <output_image_filename_no_extension>_range.json')
 
     parser.add_argument(
-        '-r', '--ranges', action='store', type=str, required=False,
+        '-r', '--ranges', action='store', default=None, type=str, required=False,
         help='The JSON string with the index ranges of image to crop. For instance, the string "[[100, 200], [300, 500, 2]]" will crop the image with:\n`image = image[tuple([slice(100, 200, 1), slice(300, 500, 2)])]`\nInstead, the the string "[[300], []]" will crop the image with:\n`image = image[tuple([slice(0, 300, 1), slice(0, image.shape[1], 1)])]`\n')
 
     parser.add_argument(
         '-c', '--dim_channel', action='store', default=None, type=int, required=False,
-        help='The channel dimension of the Image to crop. If None (default), the image is considered to have no channel dimensions.)')
+        help='The channel dimension of the Image to crop. If None (default), the image is considered to have no channel dimensions.')
 
     args = parser.parse_args()
 

@@ -31,7 +31,8 @@ class HoughDetector:
                  pred_neg, 
                  voxel_size, 
                  combine_pos_neg = POST_PROCESSING_CONFIG.combine_pos_neg,
-                 bias = 1):
+                 bias = 1,
+                 do_draw_ball=True):
         """
             Post processing class for output of vesicle detection model. 
 
@@ -72,6 +73,7 @@ class HoughDetector:
         self.voxel_size = voxel_size
         self.balls = {}
         self.bias = bias
+        self.do_draw_ball = do_draw_ball
 
     def hough_prediction(self, threshold):
         """
@@ -277,12 +279,15 @@ class HoughDetector:
         
         # Add labels as per accepted candidates. 
         for candidate in accepted_candidates:
-            self.draw_ball(
-                            array=self.prediction_result, 
-                            location=candidate.location, 
-                            diameter=self.kernel_shape, 
-                            label=candidate.label
-                            )
+            if self.do_draw_ball:
+                self.draw_ball(
+                                array=self.prediction_result,
+                                location=candidate.location,
+                                diameter=self.kernel_shape,
+                                label=candidate.label
+                                )
+            else:
+                self.prediction_result[candidate.location] = candidate.label
     
     def process(self, maxima_threshold = POST_PROCESSING_CONFIG.maxima_threshold):
 

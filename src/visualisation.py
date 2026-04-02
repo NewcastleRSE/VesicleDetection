@@ -1,4 +1,6 @@
 
+import sys
+import numpy as np
 import napari
 import zarr
 
@@ -86,16 +88,70 @@ def imshow_napari_prediction(data_path, prediction_path):
     viewer.add_image(data=hough_transformed, name='Hough Transformed', blending='additive', colormap='inferno', translate=padding)
     napari.run()
 
+
+def show_prediction(raw_image, labels):
+
+
+    # Obtain difference between input shape and output shape, to allow alignment in napari
+    padding = [
+        int((raw_image.shape[0] - labels.shape[0])/2),
+        int((raw_image.shape[1] - labels.shape[1])/2),
+        int((raw_image.shape[2] -labels.shape[2])/2)]
+
+    viewer = napari.Viewer()
+    viewer.add_image(data=raw_image, name='Raw')
+    viewer.add_image(data=labels, name='Hough Transformed', blending='additive', colormap='inferno', translate=padding)
+    napari.run()
+
+
+class Viewer:
+
+    def __init__(self, raw_image=None, name='Raw', opacity=1.0):
+
+        self.viewer = napari.Viewer()
+
+        if raw_image is None:
+            pass
+
+        elif isinstance(raw_image, np.ndarray):
+
+            self.append_raw_image(raw_image=raw_image, name=name, opacity=opacity)
+
+        else:
+            raise TypeError('raw_image must be None or np.ndarray')
+
+    def append_raw_image(self, raw_image, name='Raw', opacity=1.0):
+
+        self.viewer.add_image(data=raw_image, name=name, opacity=opacity, visible=True)
+
+    def append_labels(self, labels, name='labels', opacity=0.4):
+
+        self.viewer.add_labels(data=labels, name=name, opacity=opacity, visible=True)
+
+    def show(self):
+
+        napari.run()
+
+        # self.viewer.show(block=False)
+
+        # self.viewer.show(block=True)
+
+
 if __name__ == "__main__":
 
-    data_path = input("Provide the path to data zarr container: ")
-    prediction_path = input("Provide the path to prediction zarr container: ")
-    validation_or_predict = input("Is this validation or prediction data? (v/p): ")
+    if len(sys.argv)==4: # assume paths passed to file through command line
+        data_path = sys.argv[1]
+        prediction_path = sys.argv[2]
+        validation_or_predict = sys.argv[3]
 
-    while validation_or_predict.lower() != 'v' and validation_or_predict.lower() != 'p':
-        print("-----")
-        print("Invalid input. Please enter 'v' or 'p' only.")
+    else:
+        data_path = input("Provide the path to data zarr container: ")
+        prediction_path = input("Provide the path to prediction zarr container: ")
         validation_or_predict = input("Is this validation or prediction data? (v/p): ")
+        while validation_or_predict.lower() != 'v' and validation_or_predict.lower() != 'p':
+            print("-----")
+            print("Invalid input. Please enter 'v' or 'p' only.")
+            validation_or_predict = input("Is this validation or prediction data? (v/p): ")
 
     if validation_or_predict.lower() == 'v':
         imshow_napari_validation(data_path=data_path, prediction_path= prediction_path) 

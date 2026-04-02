@@ -176,3 +176,5 @@ Notebook/
 Model_checkpoints/
 
 saved_models/
+
+*.tif

@@ -204,6 +204,13 @@ class EMData(Dataset):
 
             # Return a dictionary containing data
             return {"raw": raw_data, "gt": gt_data}
+
+    def numpy(self):
+
+        if self.mode == "predict":
+            return self.raw_data[:]
+        else:
+            raise NotImplementedError()
         
     def create_target(self, data_type = 'int64'):
         """ 
