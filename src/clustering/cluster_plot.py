@@ -216,9 +216,33 @@ def napari_plot(raw_data, hough_data, locs, labels, out_dir, napari_plot_types=N
         viewer.add_image(hough_data, name='Hough_transformed', opacity=0.3)
 
     if napari_plot_types=='points' or isinstance(napari_plot_types, list) and 'points' in napari_plot_types:
-        point_features = {'clusters': labels,
-                      'colours': labels.astype(float)/max(labels)}  # Use labels as point features for color mapping
-        viewer.add_points(locs, size=1, features=point_features, face_color='colours', face_colormap='viridis', name='Cluster points')
+        # Create features for colors and for the text labels
+        point_features = {
+            'cluster_id': labels.astype(str),
+            'colours': labels.astype(float) / (max(labels) if max(labels) > 0 else 1)
+        }
+        
+        # Define how the text should look
+        text_parameters = {
+            'text': '{cluster_id}',
+            'size': 8,
+            'color': 'white',
+            'anchor': 'upper_right',
+            'translation': [-2, 0, 0] # Offset so text doesn't sit directly on the point
+        }
+
+        viewer.add_points(
+            locs, 
+            size=2, 
+            features=point_features, 
+            face_color='colours', 
+            face_colormap='viridis', 
+            text=text_parameters,
+            name='Cluster points'
+        )
+        # point_features = {'clusters': labels,
+        #               'colours': labels.astype(float)/max(labels)}  # Use labels as point features for color mapping
+        # viewer.add_points(locs, size=1, features=point_features, face_color='colours', face_colormap='viridis', name='Cluster points')
 
     if napari_plot_types=='volume' or isinstance(napari_plot_types, list) and 'volume' in napari_plot_types:
         # Prepare labeled volume

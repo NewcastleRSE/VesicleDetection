@@ -82,7 +82,7 @@ if __name__ == "__main__":
                 img.visible = state.show_labels
             else:
                 # Add Images
-                img = viewer.add_image(data.transpose(img_axes), name=f"{type}_{suffix}", colormap='gray', blending='additive')
+                img = viewer.add_image(data.transpose(img_axes), name=f"{type}_{suffix}", colormap='gray', blending='additive', opacity=0.6)
                 img.grid_index = (row, col)
             
                 if suffix == "3D":
