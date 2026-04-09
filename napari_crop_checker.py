@@ -305,7 +305,13 @@ if __name__ == "__main__":
         # Update the local DataFrame (find row where 'id' matches)
         state.df.loc[state.df['id'] == current_id, 'rating'] = rating.name
         state.df.loc[state.df['id'] == current_id, 'notes'] = notes.replace(',', ';')
-        state.df.loc[state.df['id'] == current_id, 'clusters to combine'] = [cid.strip() for cid in combine_ids.split(',') if cid.strip()]
+        # if there are multiple IDs to combine, split by comma and strip whitespace, then join with semicolon for storage
+        # if there are no IDs provided, just use the CID of the current crop
+        ids_list = [cid.strip() for cid in combine_ids.split(',') if cid.strip()]
+        ids_string = ";".join(ids_list)
+        if not ids_string:
+                ids_string = current_id
+        state.df.loc[state.df['id'] == current_id, 'clusters to combine'] = ids_string
         
         # Save the whole thing back to CSV
         state.df.to_csv(state.csv_path, index=False)
