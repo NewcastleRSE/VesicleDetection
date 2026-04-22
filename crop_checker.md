@@ -8,7 +8,7 @@ This tool launches Napari with an additional side bar to let a user load a folde
 
 - Python version >=3.12
 - Conda
-- 
+- Napari
 
 
 ## Installing the tool
@@ -30,9 +30,19 @@ Alternatively, you can install a non-version controlled snapshot of the project 
 2. Click on the green "code" button and select 'Download Zip' from the drop down. 
 3. Open the downloads folder and unzip the archive into an appropriate location.
 
-You will then need to activate the virtual environment and install prerequisite packages.
+You will then need to create the virtual environment and install prerequisite packages.
 
+- Run the following command
+  ```bash
+  conda create -p venv python==3.12.4 -y
+  ```
+- Activate the conda environment as instructed
+- Install the required packaged by running the following command
+  ``` bash
+  pip install -r requirements.txt
+  ```
 
+  See the README for further instructions if you have any issues at this point.
 
 
 ## Running the tool
@@ -70,8 +80,4 @@ So the first step is to run the pipeline to generate the data that needs checkin
 - If you want to re-evaluate a crop, you can use the 'Prev Crop' button to go back to the previous image
 - You can use the 'Toggle Cluster Labels' button to turn off/on the yellow labels for the clusters if they are getting in the way
 - The usual Napari transparancy and colour options are available in the top left panel of the viewer, and in the lower left you can change the visibility of the images. By default, the tool will try and load masked and raw images to overlay, so you can turn off and on the mask or change the mask layer transparancy when evaluating the crop.
-
-
-
-
 
