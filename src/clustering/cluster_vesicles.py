@@ -19,19 +19,26 @@ def cluster_vesicles(prediction_path, clusters_path="dbscan_clusters.npz", eps=5
     print(f"eps: {eps}, min_samples: {min_samples}")
     
     # ===== Load Data =====
-    print("Opening Zarr file and streaming non-zero points...")
-    z = zarr.open(prediction_path, mode='r')
-    
-    # Memory-efficient way to extract all non-zero coords
-    coords = []
-    for index, val in np.ndenumerate(z):
-        if val != 0:
-            coords.append(index)
+    if prediction_path.endswith('.csv'):
+        # the first 3 columns are x,y,z, the final column is label
+        print("Loading points from CSV file...")
+        locs = np.loadtxt(prediction_path, delimiter=',', skiprows=1, usecols=(0,1,2), dtype=np.int32)
+        print(f"Loaded {len(locs)} points from CSV")
 
-    locs = np.array(coords, dtype=np.int32)
-    del coords  # cleanup
+    else:
+        print("Opening Zarr file and streaming non-zero points...")
+        z = zarr.open(prediction_path, mode='r')
     
-    print(f"Found {len(locs)} non-zero points")
+        # Memory-efficient way to extract all non-zero coords
+        coords = []
+        for index, val in np.ndenumerate(z):
+            if val != 0:
+                coords.append(index)
+
+        locs = np.array(coords, dtype=np.int32)
+        del coords  # cleanup
+        
+        print(f"Found {len(locs)} non-zero points")
     # hough_transformed = zarr.open(prediction_path, mode='r')
     # hough_transformed = hough_transformed[:]
     

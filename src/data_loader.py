@@ -96,7 +96,7 @@ class EMData(Dataset):
             
             # Check if train/validate/predict folder is a zarr group
             if '.zgroup' not in os.listdir(self.zarr_path + "/" + self.mode):
-                raise FileNotFoundError(f"{self.zarr_path + "/" + self.mode} does not contain required '.zgroup' file.")
+                raise FileNotFoundError(f"{self.zarr_path}/{self.mode} does not contain required '.zgroup' file.")
 
             # Read in the main zarr folder
             self.data = zarr.open(self.zarr_path, mode = 'r')
@@ -160,7 +160,7 @@ class EMData(Dataset):
                     if self.raw_data.attrs["axes"] == ['z','y','x']:
                         self.axes = self.raw_data.attrs["axes"]
                     else:
-                        raise ValueError(f"Raw data axes {self.raw_data.attrs["axes"]}. Axes must be ['z','y','x'].")
+                        raise ValueError("Raw data axes {0}. Axes must be ['z','y','x'].".format(self.raw_data.attrs["axes"]))
                 else:
                     raise FileNotFoundError(f"{self.mode} raw data requires axes attribute with orientation [z,y,x].")
 

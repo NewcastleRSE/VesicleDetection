@@ -63,7 +63,7 @@ def count_positive_per_cluster(npz_path, prediction_path, csv_out, min_size=None
         
         all_keys = sorted(valid_clusters)
         for cid in all_keys:
-            cluster_name = f"cluster_{cid}_masked.zarr" if use_filenames else cid
+            cluster_name = f"cluster_{cid}_masked.h5" if use_filenames else cid
             writer.writerow([cluster_name,
                             positive.get(cid, 0),
                             negative.get(cid, 0),
@@ -86,5 +86,6 @@ if __name__ == "__main__":
     csv_out = sys.argv[3]
     min_size = sys.argv[sys.argv.index("--min_size") + 1] if "--min_size" in sys.argv else None
     max_size = sys.argv[sys.argv.index("--max_size") + 1] if "--max_size" in sys.argv else None
+    use_filenames = True if "--use_filenames" in sys.argv else False
 
-    pos,neg,tot,what = count_positive_per_cluster(npz_path, prediction_path, csv_out, min_size, max_size, use_filenames=False)
+    pos,neg,tot,what = count_positive_per_cluster(npz_path, prediction_path, csv_out, min_size, max_size, use_filenames=use_filenames)

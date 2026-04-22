@@ -1,7 +1,7 @@
 import torch 
 import os 
 import zarr
-
+import sys
 from datetime import datetime 
 
 from src.data_loader import EMData
@@ -81,26 +81,34 @@ def Apply(zarr_path: str, model_checkpoint: str):
     for atr in data.raw_data.attrs:
         f[save_location + '/Hough_transformed'].attrs[atr] = data.raw_data.attrs[atr]
     
+    # save candidate location and labels to a csv file
+    candidates_save_path = f"{save_path}/candidates.csv"
+    with open(candidates_save_path, mode='w', newline='') as file:
+        file.write("x,y,z,score,label\n")
+        for candidate in candidates:
+            x, y, z = candidate.location
+            label = candidate.label
+            file.write(f"{x},{y},{z},{label}\n")
+
     return candidates, save_path
 
 if __name__ == "__main__":
-        
-    data_path = input("Provide path to zarr container: ")
 
-    print("-----")
-
-    model_checkpoint = input("Provide the path to the model checkpoint: ")
-
-    print("-----")
-
-    visualise = input("Would you like to visualise the prediction? (y/n): ")
-
-    while visualise.lower() != 'y' and visualise.lower() != 'n':
+    if len(sys.argv)==4:
+        data_path = sys.argv[1]
+        model_checkpoint = sys.argv[2]
+        visualise = sys.argv[3]
+    else:
+        data_path = input("Provide path to zarr container: ")
         print("-----")
-        print("Invalid input. Please enter 'y' or 'n' only.")
+        model_checkpoint = input("Provide the path to the model checkpoint: ")
+        print("-----")
         visualise = input("Would you like to visualise the prediction? (y/n): ")
-
-    print("-----")
+        while visualise.lower() != 'y' and visualise.lower() != 'n':
+            print("-----") 
+            print("Invalid input. Please enter 'y' or 'n' only.")
+            visualise = input("Would you like to visualise the prediction? (y/n): ")
+        print("-----")
 
     candidates, save_location = Apply(zarr_path=data_path, model_checkpoint=model_checkpoint)
 
