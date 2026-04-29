@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         '-o', '--output_image_filename', action='store', default=None, type=str, required=False,
-        help='The filename of the output cropped image. Default is <input_image_filename_no_extension>_crop<input_image_file_extension>.')
+        help='The filename of the output cropped image. Default is <input_image_filename_no_extension>_crop.<input_image_file_extension>')
 
     parser.add_argument(
         '-s', '--output_range_filename', action='store', default=None, type=str, required=False,
@@ -89,13 +89,18 @@ if __name__ == "__main__":
 
     parser.add_argument(
         '-r', '--ranges', action='store', type=str, required=False,
-        help='The JSON string with the index ranges of image to crop. For instance, the string "[[100, 200], [300, 500, 2]]" will crop the image with:\n`image = image[tuple([slice(100, 200, 1), slice(300, 500, 2)])]`\nInstead, the the string "[[300], []]" will crop the image with:\n`image = image[tuple([slice(0, 300, 1), slice(0, image.shape[1], 1)])]`\n')
+        help='The JSON string with the index ranges of image to crop expecting the format [[start_0, stop_0, step_0], [start_1, stop_1, step_1], ...]. If not provided, the whole image will be cropped.') 
 
     parser.add_argument(
         '-c', '--dim_channel', action='store', default=None, type=int, required=False,
         help='The channel dimension of the Image to crop. If None (default), the image is considered to have no channel dimensions.)')
 
     args = parser.parse_args()
+
+    if args.input_image_filename is None:
+        raise ValueError('input_image_filename is required')
+    else:
+        print(f"Cropping input image: {args.input_image_filename}")
 
     if args.output_image_filename is None:
         dirname, basename = os.path.split(args.input_image_filename)
