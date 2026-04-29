@@ -20,7 +20,7 @@ def convert_to_zarr_predict():
         raise FileNotFoundError(f"Path to raw TIFF files does not exist: {TIFF_TO_ZARR_PREDICT_CONFIG.path_to_raw_tiff}")
     # Get raw tiff data
     raw_dir = TIFF_TO_ZARR_PREDICT_CONFIG.path_to_raw_tiff
-    raw_files = sorted(glob.glob(os.path.join(raw_dir, '*.tif')))
+    raw_files = sorted(glob.glob(os.path.join(raw_dir, '*.tif*')))
     raw = np.array([skimage.io.imread(r) for r in raw_files])
 
     # Check for stacks of images
