@@ -48,10 +48,27 @@ def cluster_crop_pipeline(
     else:
         prefix_path = predictions_path.split(".zarr")[0]
         prefix = prefix_path.split("/")[-1]
-    npz_path = f"{prefix}_clusters_eps{eps}ms{min_samples}.npz"
-    csv_out = f"{prefix}_cluster_counts.csv"
-    out_masked_path = f"{prefix}_masked.h5"
-    out_cropped_path = f"{prefix}_cropped.h5"
+
+    # create save folder based on prefix    
+    save_folder = f"data/{prefix}/"
+    os.makedirs(save_folder, exist_ok=True)
+    # save the input parameters to a text file in the save folder for reference
+    with open(os.path.join(save_folder, "input_parameters.txt"), "w") as f:
+        f.write(f"predictions_path: {predictions_path}\n")
+        f.write(f"eps: {eps}\n")
+        f.write(f"min_samples: {min_samples}\n")
+        f.write(f"raw_path: {raw_path}\n")
+        f.write(f"dilation: {dilation}\n")
+        f.write(f"n_jobs: {n_jobs}\n")
+        f.write(f"chunk_size: {chunk_size}\n")
+        f.write(f"min_size: {min_size}\n")
+        f.write(f"max_size: {max_size}\n")
+
+    npz_path = f"{save_folder}{prefix}_clusters_eps{eps}ms{min_samples}.npz"
+    csv_out = f"{save_folder}{prefix}_cluster_counts.csv"
+    out_masked_path = f"{save_folder}{prefix}_masked"
+    out_cropped_path = f"{save_folder}{prefix}_cropped"
+
 
     # -------------------------- Step 1: Cluster vesicles and save to npz
     if os.path.exists(npz_path):
@@ -147,8 +164,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="Cluster and crop vesicles pipeline.")
     parser.add_argument("--predictions_path", required=True, help="Path to hough transformed zarr data.")
-    parser.add_argument("--eps", required=False, help="DBscan clustering parameter eps, float.")
-    parser.add_argument("--min_samples", required=False, help="DBscan clustering parameter min_samples.")
+    parser.add_argument("--eps", required=True, help="DBscan clustering parameter eps, float.")
+    parser.add_argument("--min_samples", required=True, help="DBscan clustering parameter min_samples.")
     parser.add_argument("--raw_path", required=True, help="Path to raw zarr dataset.")
     parser.add_argument("--dilation", type=int, default=2, help="Dilation size for masking.")
     parser.add_argument("--n_jobs", type=int, default=4, help="Number of parallel jobs.")
@@ -160,6 +177,13 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print("Starting clustering and cropping pipeline...")
 
+    if not os.path.exists(args.predictions_path):
+        print(f"Error: Predictions path '{args.predictions_path}' does not exist.")
+        exit(1)
+
+    if not args.save_name_prefix:
+        args.save_name_prefix = None
+
     cluster_crop_pipeline(
         predictions_path=args.predictions_path,
         eps=float(args.eps),
@@ -170,7 +194,7 @@ if __name__ == "__main__":
         chunk_size=args.chunk_size,
         min_size=args.min_size,
         max_size=args.max_size,
-        use_filenames=args.use_filenames,
+        save_name_prefix=args.save_name_prefix,
     )
 # Example usage:
 #
