@@ -137,7 +137,7 @@ def cluster_crop_pipeline(
             chunk_size=chunk_size,
             min_size=min_size,
             max_size=max_size,
-            use_filenames=use_filenames,
+            use_filenames=True,
         )
 
     print("Clustering and cropping pipeline completed.")
