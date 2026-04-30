@@ -14,7 +14,7 @@ def cluster_crop_pipeline(
     chunk_size=100000,
     min_size=None,
     max_size=None,
-    use_filenames=True,
+    save_name_prefix=None,
 ):
     """
     Full pipeline to cluster vesicles, mask raw data, crop clusters, and count positives.
@@ -43,12 +43,15 @@ def cluster_crop_pipeline(
     - CSV file with positive and negative counts per cluster.
     """
 
-    prefix = predictions_path.split(".zarr")[0]
-    split_root = prefix.split("/")[-1]
-    npz_path = f"{split_root}_clusters_eps{eps}ms{min_samples}.npz"
-    csv_out = f"{split_root}_cluster_counts.csv"
-    out_masked_path = f"{split_root}_masked.h5"
-    out_cropped_path = f"{split_root}_cropped.h5"
+    if save_name_prefix:
+        prefix = save_name_prefix
+    else:
+        prefix_path = predictions_path.split(".zarr")[0]
+        prefix = prefix_path.split("/")[-1]
+    npz_path = f"{prefix}_clusters_eps{eps}ms{min_samples}.npz"
+    csv_out = f"{prefix}_cluster_counts.csv"
+    out_masked_path = f"{prefix}_masked.h5"
+    out_cropped_path = f"{prefix}_cropped.h5"
 
     # -------------------------- Step 1: Cluster vesicles and save to npz
     if os.path.exists(npz_path):
@@ -152,7 +155,7 @@ if __name__ == "__main__":
     parser.add_argument("--chunk_size", type=int, default=100000, help="Chunk size for counting positives.")
     parser.add_argument("--min_size", type=int, default=None, help="Minimum cluster size to include.")
     parser.add_argument("--max_size", type=int, default=None, help="Maximum cluster size to include.")
-    parser.add_argument("--use_filenames", action="store_true", help="Use filenames in CSV output.")
+    parser.add_argument("--save_name_prefix", required=False, help="Prefix for saved files, instead of using the default based on predictions path.")
 
     args = parser.parse_args()
     print("Starting clustering and cropping pipeline...")
