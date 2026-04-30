@@ -47,7 +47,8 @@ def process_cluster(locs, labels, cid, mask_zarr, dilation=0):
 
 def mask_clusters_parallel(raw_path, out_path, mask_file, plot=False, n_jobs=4, dilation=0):
     # Open raw data
-    f_raw = zarr.open(raw_path, mode='r')
+    print(f"Loading raw data from {raw_path}...")
+    f_raw = zarr.open(raw_path)
     raw = f_raw['raw']
 
     # Create output zarr datasets
