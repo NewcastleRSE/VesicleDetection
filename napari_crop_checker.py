@@ -7,6 +7,7 @@ from enum import Enum
 import h5py
 import glob
 import pandas as pd
+from qtpy.QtWidgets import QListWidget
 
 if __name__ == "__main__":
     # Load the napari viewer
@@ -223,8 +224,15 @@ if __name__ == "__main__":
             }
         state.df = pd.DataFrame(data)
         state.df.to_csv(state.csv_path, index=False)
-        
+            
         if state.crop_ids:
+            state.crop_ids = [str(cid) for cid in state.crop_ids]
+
+            refresh_id_list()
+            sync_id_list_value(state.crop_ids[0])
+            jump_id_input.value = state.crop_ids[0]
+            
+            state.current_idx = 0
             show_current_crop()
         else:
             print("No matching crops found in folder!")
@@ -259,30 +267,83 @@ if __name__ == "__main__":
         else:
             print(f"Missing one of the pair for ID {cid}")
 
-    # --- Create Next/Prev Buttons ---
+    # --- Navigation Widgets & Logic ---
+
+    # 1. Search by ID (Type and hit Enter)
+    jump_id_input = widgets.LineEdit(label="Jump to ID:", value="")
+    
+    @jump_id_input.changed.connect
+    def jump_by_id_logic():
+        target_id = str(jump_id_input.value).strip()
+        if target_id in state.crop_ids:
+            state.current_idx = state.crop_ids.index(target_id)
+            # Update the list selection to match without triggering another load
+            sync_id_list_value(target_id)
+            show_current_crop()
+        elif target_id != "":
+            print(f"ID {target_id} not found in current folder.")
+        else:
+            print("Please enter a valid ID to jump to.")
+
+    # 2. ID list (native Qt widget; reliable inside napari docks)
+    id_list_widget = QListWidget()
+    id_list_widget.setMinimumHeight(180)
+
+    def refresh_id_list():
+        id_list_widget.blockSignals(True)
+        id_list_widget.clear()
+        id_list_widget.addItems(state.crop_ids)
+        id_list_widget.blockSignals(False)
+
+    def sync_id_list_value(cid):
+        text = str(cid)
+        matches = id_list_widget.findItems(text, 0)
+        if matches:
+            id_list_widget.blockSignals(True)
+            id_list_widget.setCurrentItem(matches[0])
+            id_list_widget.blockSignals(False)
+
+    def jump_by_id_list_logic(value):
+        selected_id = str(value).strip()
+        if selected_id and selected_id in state.crop_ids:
+            new_idx = state.crop_ids.index(selected_id)
+            if new_idx != state.current_idx:
+                state.current_idx = new_idx
+                jump_id_input.value = selected_id
+                show_current_crop()
+
+    id_list_widget.currentTextChanged.connect(jump_by_id_list_logic)
+
     @magicgui(call_button="Next Crop >>")
     def next_crop():
-        if state.current_idx < len(state.crop_ids) - 1:
+        if state.crop_ids and state.current_idx < len(state.crop_ids) - 1:
             state.current_idx += 1
+            # Sync UI
+            next_id = state.crop_ids[state.current_idx]
+            sync_id_list_value(next_id)
+            jump_id_input.value = next_id
             show_current_crop()
 
     @magicgui(call_button="<< Prev Crop")
     def prev_crop():
-        if state.current_idx > 0:
+        if state.crop_ids and state.current_idx > 0:
             state.current_idx -= 1
+            # Sync UI
+            prev_id = state.crop_ids[state.current_idx]
+            sync_id_list_value(prev_id)
+            jump_id_input.value = prev_id
             show_current_crop()
 
-    # Create a container to hold the navigation status
     status_label = widgets.Label(value="No folder loaded")
 
+    # Combine all navigation into one container
     next_prev_widget = widgets.Container(
         widgets=[
-            prev_crop, 
-            next_crop, 
-            status_label # Use the variable here
+            jump_id_input,
+            widgets.Container(widgets=[prev_crop, next_crop], layout="horizontal", labels=False),
+            status_label
         ],
-        layout="horizontal",
-        labels=False
+        labels=True
     )
 
     @magicgui(call_button='Save Rating',
@@ -310,7 +371,7 @@ if __name__ == "__main__":
         ids_list = [cid.strip() for cid in combine_ids.split(',') if cid.strip()]
         ids_string = ";".join(ids_list)
         if not ids_string:
-                ids_string = current_id
+            ids_string = current_id
         state.df.loc[state.df['id'] == current_id, 'clusters to combine'] = ids_string
         
         # Save the whole thing back to CSV
@@ -320,16 +381,15 @@ if __name__ == "__main__":
         
         # Optional: Automatically move to next after rating
         next_crop()
-
-
-    
+ 
     #viewer.window.add_dock_widget(load_crop, area='right')    
     #viewer.window.add_dock_widget(load_raw, area='right')
 
     viewer.window.add_dock_widget(folder_navigator, area='right', name="1. Setup")
-    viewer.window.add_dock_widget(next_prev_widget, area='right', name="2. Navigation")
-    viewer.window.add_dock_widget(toggle_labels, area='right', name="3. Toggle Cluster Labels")
+    viewer.window.add_dock_widget(id_list_widget, area='right', name="2. ID List")
+    viewer.window.add_dock_widget(next_prev_widget, area='right', name="3. Navigation")
+    viewer.window.add_dock_widget(toggle_labels, area='right', name="4. Toggle Cluster Labels")
     viewer.window.add_dock_widget(load_crop, area='right', name="Optional: Load Individual Crop")
-    viewer.window.add_dock_widget(rate_crop, area='right', name="4. Scoring")
+    viewer.window.add_dock_widget(rate_crop, area='right', name="5. Scoring")
 
     napari.run()
