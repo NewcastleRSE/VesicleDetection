@@ -8,6 +8,7 @@ import h5py
 import glob
 import pandas as pd
 from qtpy.QtWidgets import QListWidget
+from qtpy.QtCore import Qt
 
 if __name__ == "__main__":
     # Load the napari viewer
@@ -197,8 +198,10 @@ if __name__ == "__main__":
 
         if os.path.exists(state.csv_path):
             state.df = pd.read_csv(state.csv_path)
-            # Convert ID column to string to ensure matching works
-            state.df['id'] = state.df['id'].astype(str)
+            # Normalize text columns so later string assignments do not hit float/object mismatches.
+            for col in ['id', 'rating', 'notes', 'masked_path', 'clusters to combine']:
+                if col in state.df.columns:
+                    state.df[col] = state.df[col].fillna('').astype(str)
             if not all(col in state.df.columns for col in ['id', 'rating', 'notes', 'masked_path', 'clusters to combine']):
                 print("Adding missing columns to existing CSV...")
                 if 'clusters to combine' not in state.df.columns:
@@ -297,7 +300,7 @@ if __name__ == "__main__":
 
     def sync_id_list_value(cid):
         text = str(cid)
-        matches = id_list_widget.findItems(text, 0)
+        matches = id_list_widget.findItems(text, Qt.MatchExactly)
         if matches:
             id_list_widget.blockSignals(True)
             id_list_widget.setCurrentItem(matches[0])
@@ -312,7 +315,8 @@ if __name__ == "__main__":
                 jump_id_input.value = selected_id
                 show_current_crop()
 
-    id_list_widget.currentTextChanged.connect(jump_by_id_list_logic)
+    # Connect via itemClicked to be compatible across Qt versions
+    id_list_widget.itemClicked.connect(lambda item: jump_by_id_list_logic(item.text()))
 
     @magicgui(call_button="Next Crop >>")
     def next_crop():
