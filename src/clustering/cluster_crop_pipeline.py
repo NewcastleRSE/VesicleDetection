@@ -79,15 +79,19 @@ def cluster_crop_pipeline(
     if recreate.lower() != 'y':
         print("Skipping clustering step.")
     else:
-        print("Starting vesicle clustering...")
-        cluster_vesicles(predictions_path, npz_path, eps, min_samples)
+        if os.path.exists(f"{predictions_path}/candidates.csv"):
+            print("Starting vesicle clustering using the candidates file...")
+            cluster_vesicles(f"{predictions_path}/candidates.csv", npz_path, eps, min_samples)
+        else:
+            print("Starting vesicle clustering using the hough transformed data...")
+            cluster_vesicles(f"{predictions_path}/Hough_transformed", npz_path, eps, min_samples)
 
     print("Clustering completed. Starting masking and cropping...")
 
     # ------------------------- Masking raw data in parallel
 
-    if os.path.exists(out_masked_path):
-        recreate_mask = input(f"Masked file {out_masked_path} already exists, would you like to recreate it? (y/n): ")
+    if os.path.exists(f"{out_masked_path}_convexhull"):
+        recreate_mask = input(f"Masked file {out_masked_path}_convexhull already exists, would you like to recreate it? (y/n): ")
     else:         
         recreate_mask = 'y'  # If file doesn't exist, we need to create it
         
@@ -97,7 +101,7 @@ def cluster_crop_pipeline(
         print("Starting masking of raw data...")
         mask_clusters_parallel(
             raw_path,
-            out_masked_path,
+            f"{out_masked_path}_convexhull",
             npz_path,
             n_jobs=n_jobs,
             plot=True,
@@ -114,6 +118,38 @@ def cluster_crop_pipeline(
         if continue_pipeline.lower() == 'n':
             print("Pipeline stopped by user. You can rerun the pipeline with the generated masked data.")
             return
+        
+    print("Convex hull masking complete, starting vesicle masking...")
+
+    
+    if os.path.exists(f"{out_masked_path}_vesicle"):
+        recreate_mask = input(f"Masked file {out_masked_path}_vesicle already exists, would you like to recreate it? (y/n): ")
+    else:         
+        recreate_mask = 'y'  # If file doesn't exist, we need to create it
+        
+    if recreate_mask.lower() != 'y':
+        print("Skipping masking step.")
+    else:
+        print("Starting masking of raw data...")
+        mask_clusters_parallel(
+            raw_path,
+            f"{out_masked_path}_vesicle",
+            predictions_path,
+            n_jobs=n_jobs,
+            plot=True,
+            dilation=dilation,
+        )
+
+        continue_pipeline = input("Do you want to continue the pipeline with the current mask data? (y/n): ")
+        while continue_pipeline.lower() != 'y' and continue_pipeline.lower() != 'n':
+            print("-----") 
+            print("Invalid input. Please enter 'y' or 'n' only.")
+            continue_pipeline = input("Do you want to continue the pipeline with the current mask data? (y/n): ")
+        print("-----")
+
+        if continue_pipeline.lower() == 'n':
+            print("Pipeline stopped by user. You can rerun the pipeline with the generated masked data.")
+            return 
 
     print("Masking completed. Starting cropping...")
 
