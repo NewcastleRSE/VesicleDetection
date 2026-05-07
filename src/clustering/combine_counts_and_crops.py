@@ -96,8 +96,8 @@ def process_and_combine_crops(prefix, base_path='.'):
                          and it will look for files like "cluster_4_masked.h5" inside those folders. It will then create new files like "19-13_subvolume_0647-1670_cluster_4_masked.h5" in a combined folder, and it will create a csv file with the counts for each cluster and the new filenames.
     """
     # find the relevant folders and file
-    convex_folder = glob.glob(f"{base_path}/{prefix}*convexhullmask*")
-    vesicle_folder = glob.glob(f"{base_path}/{prefix}*vesiclemask*")
+    convex_folder = glob.glob(f"{base_path}/{prefix}*convexhull*")
+    vesicle_folder = glob.glob(f"{base_path}/{prefix}*vesicle*")
     labels_file = f"{base_path}/{prefix}labels.csv"
     convex_folder = convex_folder[0] if convex_folder else None
     vesicle_folder = vesicle_folder[0] if vesicle_folder else None
