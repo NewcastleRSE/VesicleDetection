@@ -10,10 +10,18 @@ def find_and_combine(path='.'):
     all_results = []
     # Find all unique prefixes from your labels files
     prefixes = [os.path.basename(f).replace('labels.csv', '') for f in glob.glob(f"{path}/*labels.csv")]
-
-    for p in prefixes:
-        print(f"Processing {p}...")
-        process_and_combine_crops(p,path)
+    print(f"Found {len(prefixes)} unique prefixes: {prefixes}")
+    if len(prefixes) == 0:
+        print("No labels files found. Please ensure there are files ending with 'labels.csv' in the specified path.")
+        return
+    elif len(prefixes) == 1:
+        print(f"Only one prefix found: {prefixes[0]}. No combination needed, but processing will still occur.")
+        process_and_combine_crops(prefixes[0], path, combine=False)
+    else:
+        print(f"Multiple label files found. Processing and combining crops for all prefixes.")
+        for p in prefixes:
+            print(f"Processing {p}...")
+            process_and_combine_crops(p,path,combine=True)
 
 
 def get_combined_counts_map(labels_file, ratings_path):
@@ -57,17 +65,19 @@ def get_combined_counts_map(labels_file, ratings_path):
             
     return counts_map
 
-def process_files(folder, combined_folder, counts_map, labels_combined_path, prefix):
-    for fname in os.listdir(folder):
+def process_files(folder, combined_folder, counts_map, labels_combined_path, prefix, combined=True):
+    for fname in os.listdir(f"{folder}/masked"):
         if fname.endswith("_masked.h5") and not fname.startswith(prefix):
             cluster_id = fname.replace("cluster_", "").replace("_masked.h5", "")
             
             if cluster_id in counts_map:
                 data = counts_map[cluster_id]
                 new_fname = f"{prefix}_{fname}"
+                print(f"Processing file {fname} with cluster ID {cluster_id}. Counts: pos={data['pos']}, neg={data['neg']}, size={data['size']}")
                 
-                # Copy the file
-                shutil.copy(os.path.join(folder, fname), os.path.join(combined_folder, new_fname))
+                # Copy the file if combining and the new file doesn't already exist
+                if combined:
+                    shutil.copy(os.path.join(folder, fname), os.path.join(combined_folder, new_fname))
                 
                 # Write to CSV
                 with open(labels_combined_path, "a", encoding="utf-8") as f:
@@ -86,7 +96,7 @@ def process_files(folder, combined_folder, counts_map, labels_combined_path, pre
                 print(f"Warning: Cluster ID {cluster_id} or filename {fname} not found in labels file for prefix {prefix}. Skipping counts for this file.")
 
 
-def process_and_combine_crops(prefix, base_path='.'):
+def process_and_combine_crops(prefix, base_path='.', combine=True):
     """This function will find folders with the prefix before convexhullmask or vesiclemask, it will rename the internal files to have the prefix appended if it isn't already,
     and then it will move the files into a combined folder to hold all the processed crops if they are not already there. It will also create a combined csv file with the counts for each cluster and the new filenames.
     The counts will be combined according to the "clusters to combine" column in the ratings file, and the new filenames will be in the format "{prefix}_cluster_{id}_masked.h5".
@@ -97,36 +107,59 @@ def process_and_combine_crops(prefix, base_path='.'):
     """
     # find the relevant folders and file
     convex_folder = glob.glob(f"{base_path}/{prefix}*convexhull*")
+    if not convex_folder:
+        print(f"No convex hull folder found for prefix {prefix} in {base_path}.")
+        convex_folder = None
+    else:        
+        convex_folder = convex_folder[0]
     vesicle_folder = glob.glob(f"{base_path}/{prefix}*vesicle*")
+    if not vesicle_folder:
+        print(f"No vesicle folder found for prefix {prefix} in {base_path}.")
+        vesicle_folder = None
+    else:
+        vesicle_folder = vesicle_folder[0]
     labels_file = f"{base_path}/{prefix}labels.csv"
-    convex_folder = convex_folder[0] if convex_folder else None
-    vesicle_folder = vesicle_folder[0] if vesicle_folder else None
-    if not convex_folder and not vesicle_folder:
-        print(f"No folders found for prefix {prefix} in {base_path}. Skipping.")
-        return
-    combined_folder = f"{base_path}/combined_data"
-    os.makedirs(combined_folder, exist_ok=True)
-    convex_combined = "convexhull_combined"
-    vesicle_combined = "vesicle_combined"
-    os.makedirs(os.path.join(combined_folder, convex_combined), exist_ok=True)
-    os.makedirs(os.path.join(combined_folder, vesicle_combined), exist_ok=True)
-    # make the labels combined csv file if it doesn't exist, with the appropriate header:
-    labels_combined_path = os.path.join(combined_folder, "combined_labels.csv")
-    if not os.path.exists(labels_combined_path):
-        with open(labels_combined_path, "w", encoding="utf-8") as f:
-            f.write("cluster,positive_count,negative_count,cluster_size\n")
-
     if not os.path.exists(labels_file):
         print(f"Labels file {labels_file} not found for prefix {prefix}. Skipping.")
         return
+    if not convex_folder and not vesicle_folder:
+        print(f"No folders found for prefix {prefix} in {base_path}. Skipping.")
+        return
     
-    counts_map = get_combined_counts_map(labels_file, f"{base_path}/{prefix}ratings.csv")
+    if combine:
+        combined_folder = f"{base_path}/combined_data"
+        os.makedirs(combined_folder, exist_ok=True)
+        convex_combined = "convexhull_combined"
+        vesicle_combined = "vesicle_combined"
+        os.makedirs(os.path.join(combined_folder, convex_combined), exist_ok=True)
+        os.makedirs(os.path.join(combined_folder, vesicle_combined), exist_ok=True)
+    else:
+        combined_folder = base_path
+        # make the labels combined csv file if it doesn't exist, with the appropriate header:
+    labels_combined_path = os.path.join(combined_folder, f"{prefix}_labelscombined.csv")
+    if not os.path.exists(labels_combined_path):
+
+        with open(labels_combined_path, "w", encoding="utf-8") as f:
+            f.write("cluster,positive_count,negative_count,cluster_size\n")
+   
+    if os.path.exists(f"{base_path}/{prefix}ratings.csv"):
+        print(f"Ratings file found for prefix {prefix}. Combining counts according to ratings.")
+        counts_map = get_combined_counts_map(labels_file, f"{base_path}/{prefix}ratings.csv")
+    else:
+        print(f"No ratings file found for prefix {prefix}. Using original counts without combination or filtering by ratings.")
+        counts_map = get_combined_counts_map(labels_file, "")
 
     # find the relevant files and rename and move them if necessary, and add the filename to the combined csv file with the counts
-    if convex_folder:
-        process_files(convex_folder, os.path.join(combined_folder, convex_combined), counts_map, labels_combined_path, prefix)
-    if vesicle_folder:
-        process_files(vesicle_folder, os.path.join(combined_folder, vesicle_combined), counts_map, labels_combined_path, prefix)
+    if combine:
+        if convex_folder:
+            process_files(convex_folder, os.path.join(combined_folder, convex_combined), counts_map, labels_combined_path, prefix, combined=combine)
+        if vesicle_folder:
+            process_files(vesicle_folder, os.path.join(combined_folder, vesicle_combined), counts_map, labels_combined_path, prefix, combined=combine)
+    else:
+        if convex_folder:
+            process_files(convex_folder, convex_folder, counts_map, labels_combined_path, prefix, combined=combine)
+        if vesicle_folder:
+            process_files(vesicle_folder, vesicle_folder, counts_map, labels_combined_path, prefix, combined=combine)
 
   
 if __name__ == "__main__":

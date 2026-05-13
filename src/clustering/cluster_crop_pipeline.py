@@ -65,7 +65,7 @@ def cluster_crop_pipeline(
         f.write(f"max_size: {max_size}\n")
 
     npz_path = f"{save_folder}{prefix}_clusters_eps{eps}ms{min_samples}.npz"
-    csv_out = f"{save_folder}{prefix}_cluster_counts.csv"
+    csv_out = f"{save_folder}{prefix}_labels.csv"
     out_masked_path = f"{save_folder}{prefix}_masked"
     out_cropped_path = f"{save_folder}{prefix}_cropped"
 
@@ -155,19 +155,35 @@ def cluster_crop_pipeline(
 
     # ------------------------- Crop clusters in parallel
 
-    if os.path.exists(out_cropped_path):
-        recreate_crop = input(f"Cropped file {out_cropped_path} already exists, would you like to recreate it? (y/n): ")
+    if os.path.exists(f"{out_cropped_path}_convexhull"):
+        recreate_crop = input(f"Cropped file {out_cropped_path}_convexhull already exists, would you like to recreate it? (y/n): ")
     else:
         recreate_crop = 'y'  # If file doesn't exist, we need to create it
     
     if recreate_crop.lower() != 'y':
-        print("Skipping cropping step.")
+        print("Skipping convex hull cropping step.")
     else:
         crop_clusters_parallel(
             raw_path,
-            out_masked_path,
+            f"{out_masked_path}_convexhull",
             npz_path,
-            out_cropped_path,
+            f"{out_cropped_path}_convexhull",
+            n_jobs=n_jobs,
+        )
+    print("Convex hull cropping complete, starting vesicle cropping...")
+
+    if os.path.exists(f"{out_cropped_path}_vesicle"):
+        recreate_crop = input(f"Cropped file {out_cropped_path}_vesicle already exists, would you like to recreate it? (y/n): ")
+    else:
+        recreate_crop = 'y'  # If file doesn't exist, we need to create it
+    if recreate_crop.lower() != 'y':
+        print("Skipping vesicle masked cropping step.")
+    else:
+        crop_clusters_parallel(
+            raw_path,
+            f"{out_masked_path}_vesicle",
+            npz_path,
+            f"{out_cropped_path}_vesicle",
             n_jobs=n_jobs,
         )
 
@@ -182,10 +198,10 @@ def cluster_crop_pipeline(
     if recreate_csv.lower() != 'y':
         print("Skipping counting positives step.")
     else:
-        raw_path_for_counting = f"{raw_path}/raw" if raw_path.endswith("predict") else raw_path
+        
         count_positive_per_cluster(
             npz_path,
-            raw_path_for_counting,
+            f"{predictions_path}/Hough_transformed",
             csv_out,
             chunk_size=chunk_size,
             min_size=min_size,
