@@ -174,7 +174,7 @@ if __name__ == "__main__":
     @magicgui(
             call_button="Initialize Folder",
             folder_path={"label": "Select Folder", "mode": "d"},
-            npz_path={"label": "Cluster NPZ", "filter": "*.npz"} 
+            npz_path={"label": "Cluster NPZ", "filter": "*.npz"},
         )
     def folder_navigator(folder_path=pathlib.Path.cwd(), npz_path=pathlib.Path.cwd()):
         """Finds all clusters and prepares the list."""
@@ -188,9 +188,11 @@ if __name__ == "__main__":
             state.cluster_labels = data['labels']
         
         # Find all files matching the pattern and extract IDs
-        files = glob.glob(str(masked_dir / "cluster_*_masked.h5"))
+        files = glob.glob(str(masked_dir / "*cluster_*_masked.h5"))
         # Sort numerically by extracting the number from the filename
-        state.crop_ids = sorted([os.path.basename(f).split('_')[1] for f in files], key=int)
+        # need this to find the crop IDs, which are assumed to be in the format "*cluster_{id}_masked.h5" but there can be any prefix, including underscores, before "cluster"
+        state.crop_ids = sorted([os.path.basename(f).split('cluster_')[1].split('_masked.h5')[0] for f in files], key=int)
+        # state.crop_ids = sorted([os.path.basename(f).split('_')[1] for f in files], key=int)
         state.current_idx = 0
 
         folder_name = os.path.basename(folder_path)
@@ -251,24 +253,30 @@ if __name__ == "__main__":
 
     def show_current_crop():
         cid = state.crop_ids[state.current_idx]
-        m_path = state.root_path / "masked" / f"cluster_{cid}_masked.h5"
-        r_path = state.root_path / "raw" / f"cluster_{cid}_raw.h5"
+        
+        # Look inside the directory and find a file that ends with the cluster pattern
+        m_dir = state.root_path / "masked"
+        m_path = next(m_dir.glob(f"*cluster_{cid}_masked.h5"), None)
+
+        r_dir = state.root_path / "raw"
+        r_path = next(r_dir.glob(f"*cluster_{cid}_raw.h5"), None)
+
+        # Safety check to make sure the files were actually found
+        if m_path is None or r_path is None:
+            raise FileNotFoundError(f"Could not find masked or raw files for cluster {cid} with pattern *cluster_{cid}_*.h5")
         viewer.layers.clear()
  
-        if m_path.exists() and r_path.exists():
-            with h5py.File(m_path, 'r') as f:
-                dat_shape = f[list(f.keys())[0]].shape
+        with h5py.File(m_path, 'r') as f:
+            dat_shape = f[list(f.keys())[0]].shape
 
-            if state.cluster_locs is not None and state.cluster_labels is not None:
-                pts, ids = get_nearby_clusters(cid, dat_shape)
-                if pts is not None and ids is not None:
-                    load_4panel_view((pts, ids), type="points")
-            load_4panel_view(m_path, type="masked")
-            load_4panel_view(r_path, type="raw")
-            # Update the label on our custom button container
-            status_label.value = f"Crop {state.current_idx + 1} of {len(state.crop_ids)} (ID: {cid})"
-        else:
-            print(f"Missing one of the pair for ID {cid}")
+        if state.cluster_locs is not None and state.cluster_labels is not None:
+            pts, ids = get_nearby_clusters(cid, dat_shape)
+            if pts is not None and ids is not None:
+                load_4panel_view((pts, ids), type="points")
+        load_4panel_view(m_path, type="masked")
+        load_4panel_view(r_path, type="raw")
+        # Update the label on our custom button container
+        status_label.value = f"Crop {state.current_idx + 1} of {len(state.crop_ids)} (ID: {cid})"
 
     # --- Navigation Widgets & Logic ---
 
