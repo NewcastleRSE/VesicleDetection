@@ -153,4 +153,5 @@ If you want to combine multiple crops into one, just have all of them in the sam
 This final step should combine the crops into one folder if there are multiple prefixes, and if not just rename the crops in their current folder to have the appropriate prefix, and create an output `<prefix>_labelscombined.csv` which will also combine cluster labels where there is a `*ratings.csv` file to be processed with any clusters to combine. 
 
 The `<prefix>_labelscombined.csv` and the folder with the crops can then be shared for model training.
-                      
+
+NB: if there are any issues at this step you may need to delete the 'good' folder and try again. 

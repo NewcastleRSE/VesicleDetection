@@ -80,4 +80,5 @@ So the first step is to run the pipeline to generate the data that needs checkin
 - If you want to re-evaluate a crop, you can use the 'Prev Crop' button to go back to the previous image
 - You can use the 'Toggle Cluster Labels' button to turn off/on the yellow labels for the clusters if they are getting in the way
 - The usual Napari transparancy and colour options are available in the top left panel of the viewer, and in the lower left you can change the visibility of the images. By default, the tool will try and load masked and raw images to overlay, so you can turn off and on the mask or change the mask layer transparancy when evaluating the crop.
+- If you want to skip to a specific crop you can either select from the file list in the side panel, or type the ID number into the box next to 'Jump to ID'.
 
