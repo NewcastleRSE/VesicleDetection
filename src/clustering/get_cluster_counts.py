@@ -89,3 +89,12 @@ if __name__ == "__main__":
     use_filenames = True if "--use_filenames" in sys.argv else False
 
     pos,neg,tot,what = count_positive_per_cluster(npz_path, prediction_path, csv_out, min_size, max_size, use_filenames=use_filenames)
+
+    print("\n--- Summary ---")
+    print(f"Total clusters counted: {len(pos)}")
+    print(f"Example cluster counts (first 10):")
+    for i, (cid, count) in enumerate(pos.items()):
+        if i >= 10:
+            break
+        print(f"Cluster {cid}: {count} positives, {neg.get(cid, 0)} negatives, size {tot.get(cid, 0)}") 
+    print(f"Number of unknown values found: {sum(len(v) for v in what.values())}")

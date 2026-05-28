@@ -177,9 +177,41 @@ def get_combined_counts_map(labels_file, ratings_path):
             target_id = str(row['id'])
             # Split by semicolon as per your data
             to_combine = str(row['clusters to combine']).split(';')
+
+            # add sanity checks in case of human error - the to_combine list should only contain cluster IDs that are present in the labels file, and if any are not, print a warning and skip them. Also, if the target_id is not in the labels file, print a warning and skip it.
+            if target_id not in df_labels.index:
+                print(f"Warning: Target ID {target_id} not found in labels file. Skipping this combination and just using the original count.")
+                counts_map[target_id] = {
+                    'pos': df_labels.loc[target_id, 'positive_count'] if target_id in df_labels.index else 0,
+                    'neg': df_labels.loc[target_id, 'negative_count'] if target_id in df_labels.index else 0,
+                    'size': df_labels.loc[target_id, 'cluster_size'] if target_id in df_labels.index else 0
+                }
+                continue
+            valid_cluster_ids = [cid.strip() for cid in to_combine if cid.strip() in df_labels.index]
+            invalid_cluster_ids = [cid.strip() for cid in to_combine if cid.strip() not in df_labels.index]
+            if invalid_cluster_ids:
+                print(f"Warning: The following cluster IDs to combine for target ID {target_id} were not found in labels file and will be skipped: {invalid_cluster_ids}")
+            # check that the valid cluster ids list is not empty after removing invalid cluster ids, and if it is empty, print a warning and skip the combination for this target_id
+            if not valid_cluster_ids:
+                print(f"Warning: No valid cluster IDs to combine for target ID {target_id} after removing invalid cluster IDs. Skipping this combination and just using the original count.")
+                counts_map[target_id] = {
+                    'pos': df_labels.loc[target_id, 'positive_count'] if target_id in df_labels.index else 0,
+                    'neg': df_labels.loc[target_id, 'negative_count'] if target_id in df_labels.index else 0,
+                    'size': df_labels.loc[target_id, 'cluster_size'] if target_id in df_labels.index else 0
+                }
+                continue
+            # check whether the target_id is also in the to_combine list, if it isn't then add it to the list so that its counts are included in the sum, and if it is, then we don't need to do anything since its counts will already be included in the sum when we loop through the to_combine list
+            if target_id not in valid_cluster_ids:
+                print(f"Note: Target ID {target_id} not found in 'clusters to combine' list for this target ID. Adding it to the list to include its counts in the combination.")
+                valid_cluster_ids.append(target_id)
             
+            # Check for any duplicate cluster IDs in the to_combine list, and if there are any, print a warning and remove the duplicates before summing the counts, since duplicate cluster IDs would lead to double counting of those clusters in the combined counts.
+            if len(valid_cluster_ids) != len(set(valid_cluster_ids)):
+                print(f"Warning: Duplicate cluster IDs found in 'clusters to combine' for target ID {target_id}. Removing duplicates to avoid double counting. Duplicates: {[cid for cid in valid_cluster_ids if valid_cluster_ids.count(cid) > 1]}")
+                valid_cluster_ids = list(set(valid_cluster_ids))
+
             pos_sum, neg_sum, size_sum = 0, 0, 0
-            for cid in to_combine:
+            for cid in valid_cluster_ids:
                 cid = cid.strip()
                 if cid in df_labels.index:
                     pos_sum += df_labels.loc[cid, 'positive_count']
