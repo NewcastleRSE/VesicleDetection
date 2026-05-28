@@ -1,3 +1,4 @@
+from glob import glob
 import pandas as pd
 import shutil
 import sys
@@ -41,11 +42,14 @@ def process_good_ratings(csv_input_path):
     error_count = 0
 
     for _, row in good_rows.iterrows():
+        # Get the relative path from the CSV and construct the full source path by searching for the file in the base directory. The relative path in the CSV might not include any prefix, so we need to search for files that end with the relative path from the CSV.
         relative_path_str = str(row['masked_path']).strip()
-        
-        # Combine base_dir + relative_path from CSV
+        relative_path_str = relative_path_str.split('/')[-1]  # Get just the filename part from the relative path
+        print(f"Looking for files that end with: {relative_path_str} in {base_dir}")
+        relative_path_str = glob(str(base_dir / f"masked/*{relative_path_str}"))  # Search for files that end with the relative path from the CSV
+        print(f"Processing row with masked_path: {row['masked_path']} -> Found files: {relative_path_str}")
         # This handles the "append" logic you requested
-        full_source_path = (base_dir / relative_path_str).resolve()
+        full_source_path = (base_dir / relative_path_str[0]).resolve()
         
         if not full_source_path.exists():
             print(f"File not found: {full_source_path}")

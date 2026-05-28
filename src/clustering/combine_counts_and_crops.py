@@ -9,6 +9,18 @@ from find_good_crops import process_good_ratings
 
 
 def find_and_combine(path='.'):
+    """ This function will find all the unique prefixes from the labels files in the specified path, 
+    and for each prefix, it will find the relevant folders and files, it will rename the internal 
+    files to have the prefix appended if it isn't already, and then it will move the files into a 
+    combined folder to hold all the processed crops if they are not already there. 
+    It will also create a combined csv file with the counts for each cluster and the new filenames. 
+    The counts will be combined according to the "clusters to combine" column in the ratings file, 
+    and the new filenames will be in the format "{prefix}_cluster_{id}_masked.h5".
+
+    Args:
+        path (str, optional): The path to the directory containing the cropped_convexhull folder and labels csv file, 
+                              as produced by the cluster_crop_pipeline. Defaults to the current working directory.
+    """
     # --- Execution Loop ---
     all_results = []
     # Find all unique prefixes from your labels files
@@ -73,7 +85,8 @@ def process_and_combine_crops(prefix, base_path='.', combine=True):
         with open(labels_combined_path, "w", encoding="utf-8") as f:
             f.write("cluster,positive_count,negative_count,cluster_size\n")
    
-    ratings_path = glob.glob(f"{convex_folder}/*ratings.csv")
+    ratings_path = glob.glob(f"{convex_folder}/*ratings.csv") if convex_folder else None
+    print(f"Looking for ratings file in {convex_folder} for prefix {prefix}. Found: {ratings_path}")
     if ratings_path:
         # check if the ratings have been completed by looking for any 'Good' ratings in the ratings file, and if there are any, then combine the counts according to the "clusters to combine" column in the ratings file. If there are no 'Good' ratings, then just use the original counts without combination.
         df_ratings = pd.read_csv(ratings_path[0])
@@ -89,13 +102,19 @@ def process_and_combine_crops(prefix, base_path='.', combine=True):
                     # check if good exists in the vesicle folder as well, and if not, copy the good folder from the convex hull folder to the vesicle folder if it exists, since the process_files function will look for the good folder in the same folder as the ratings file. If there is no vesicle folder, then create it with the process_good_ratings function.
                     if vesicle_folder and not os.path.exists(f"{vesicle_folder}/good"):
                         print(f"'Good' folder not found in {vesicle_folder}. Creating good version for vesicles too")
-                        process_good_ratings(f"{vesicle_folder}/{ratings_path[0]}")
+                        ratings_path_in_vesicle = glob.glob(f"{vesicle_folder}/*ratings.csv")
+                        if not os.path.exists(ratings_path_in_vesicle[0]):
+                            shutil.copy(ratings_path[0], vesicle_folder)
+                        process_good_ratings(ratings_path_in_vesicle[0])
                 else: # there are good ratings but no good folder
                     print(f"'Good' ratings found in ratings file for prefix {prefix}. Creating 'good' folder and copying relevant files.")
-                    process_good_ratings(ratings_path)
+                    process_good_ratings(ratings_path[0])
                     if vesicle_folder and not os.path.exists(f"{vesicle_folder}/good"):
+                        ratings_path_in_vesicle = glob.glob(f"{vesicle_folder}/*ratings.csv")
+                        if not os.path.exists(ratings_path_in_vesicle[0]):
+                            shutil.copy(ratings_path[0], vesicle_folder)
                         print(f"'Good' folder not found in {vesicle_folder}. Creating good version for vesicles too")
-                        process_good_ratings(f"{vesicle_folder}/{ratings_path[0]}")
+                        process_good_ratings(ratings_path_in_vesicle[0])
             else:
                 print(f"No 'Good' ratings found in ratings file for prefix {prefix}. Do you need to complete the ratings for this dataset? Using original counts without combination or filtering by ratings.")
                 counts_map = get_combined_counts_map(labels_file, "")
@@ -119,6 +138,18 @@ def process_and_combine_crops(prefix, base_path='.', combine=True):
 
 
 def get_combined_counts_map(labels_file, ratings_path):
+    """This function will load the labels file to get the original counts for each cluster,
+      and if a ratings file is provided and contains 'Good' ratings, it will combine the counts 
+      according to the "clusters to combine" column in the ratings file. It will return a dictionary
+      mapping each cluster ID (or combined cluster ID) to its positive count, negative count, and cluster size.
+      
+      Args:
+          labels_file (str): The path to the labels CSV file that contains the original counts for each cluster.
+          ratings_path (str): The path to the ratings CSV file that contains the ratings and the "clusters to combine" 
+                              information. If this is an empty string, then no combination will be done and the 
+                              original counts from the labels file will be used.
+      
+      """
     print(f"Loading labels from {labels_file}...")
     df_labels = pd.read_csv(labels_file)
     # Clean the labels to have a string integer index
@@ -161,6 +192,20 @@ def get_combined_counts_map(labels_file, ratings_path):
     return counts_map
 
 def process_files(folder, combined_folder, counts_map, labels_combined_path, prefix, combined=True):
+    """This function will look for files in the specified folder that match the pattern "*cluster_{id}_masked.h5",
+      and for each file, it will check if the cluster ID is in the counts_map. 
+      If it is, it will rename the file to have the prefix appended if it doesn't already, 
+      and then it will copy the file to the combined_folder if combining, or rename it in place if not combining.
+      It will also add an entry to the labels_combined_path CSV file with the new filename and the corresponding counts from the counts_map.
+
+    Args:
+        folder (str): The path to the folder containing the masked files.
+        combined_folder (str): The path to the folder where combined files will be stored.
+        counts_map (dict): A dictionary mapping each cluster ID to its combined counts.
+        labels_combined_path (str): The path to the CSV file where combined labels will be stored.
+        prefix (str): The prefix to be added to the filenames of the combined files.
+        combined (bool, optional): Whether to combine the files. Defaults to True.
+    """
 
     if not os.path.exists(f"{folder}/good"):
         print(f"Good subfolder not found in {folder}. Using original masked files without filtering by ratings.")
@@ -198,18 +243,13 @@ def process_files(folder, combined_folder, counts_map, labels_combined_path, pre
                 # Write to CSV
                 with open(labels_combined_path, "a", encoding="utf-8") as f:
                     f.write(f"{new_fname},{data['pos']},{data['neg']},{data['size']}\n")
-            # labels_df['cluster'] = labels_df['cluster'].astype(str)  # Ensure cluster column is string for comparison
-            # cluster_id = fname.replace("cluster_", "").replace("_masked.h5", "")
-            # if cluster_id in labels_df['cluster'].values:
-            #     row = labels_df[labels_df['cluster'] == cluster_id].iloc[0]
-            #     with open(labels_combined_path, "a", encoding="utf-8") as f:
-            #         f.write(f"{new_fname},{row['positive_count']},{row['negative_count']},{row['cluster_size']}\n")
-            # elif fname in labels_df['cluster'].values:
-            #     row = labels_df[labels_df['cluster'] == fname].iloc[0] 
-            #     with open(labels_combined_path, "a") as f:
-            #         f.write(f"{new_fname},{row['positive_count']},{row['negative_count']},{row['cluster_size']}\n")
+            
             else:
                 print(f"Warning: Cluster ID {cluster_id} or filename {fname} not found in labels file for prefix {prefix}. Skipping counts for this file.")
+    # now reoopen the csv and check for duplicate filenames and remove any, as appending means rerunning will create duplicates in the csv file, but we only want one entry per file. We can identify duplicates by looking for duplicate filenames in the first column, and we can keep the first occurrence and remove any subsequent occurrences.
+    df_combined = pd.read_csv(labels_combined_path)
+    df_combined = df_combined.drop_duplicates(subset=['cluster'], keep='first')
+    df_combined.to_csv(labels_combined_path, index=False)
 
   
 if __name__ == "__main__":

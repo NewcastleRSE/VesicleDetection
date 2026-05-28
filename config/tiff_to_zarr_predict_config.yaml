@@ -7,9 +7,10 @@ attributes:
   - 0
   - 0
   - 0
-  resolution: !!python/tuple
-  - 1
-  - 1
-  - 1
-output_zarr_path: data/name/predict
-path_to_raw_tiff: ''
+  resolution: !!python/tuple # Resolution is in amstrongs per pixel
+  - 60
+  - 60
+  - 60
+output_zarr_path: '/path/to/output.zarr'
+path_to_raw_tiff: '/path/to/raw/tiff/folder'
+# NB!! The path to raw tiff should be to a folder containing tiff stacks, not the tiff files themselves!
