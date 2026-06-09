@@ -19,21 +19,21 @@ This code comes equipped with `setup.py` and `requirements.txt` files to allow f
 - Navigate to the downloaded directory containing the code (either in terminal or in a IDE such as VS Code).
 - Run the following command
   ```bash
-  conda create -p venv python==3.12.4 -y
+  conda create --name VesicleDetection python==3.12.4 -y
   ```
-- Activate the conda environment as instructed
+- Activate the conda environment as instructed (`conda activate VesicleDetection`)
 - Install the required packaged by running the following command
   ``` bash
   pip install -r requirements.txt
   ```
 
-This should create a virtual conda enviroment, with name `venv`, within the directory containing the code. 
+This should create a virtual conda enviroment, with name `VesicleDetection`, within the directory containing the code. 
 
 > [!WARNING]
 > Issues may occur with the above installation due to the `cython` and `funlib-evaluate` packages. If an error is raised saying it cannot find cython, it is advised to temporarily delete the funlib line from the requirements.txt file, run the pip install command to ensure cython is installed, and then paste the funlib line back in. Running the pip install command a second time should now finish the installation of all required packages.
 
 > [!IMPORTANT]
->  This code has been set up on a Linux Ubuntu machine, and the packages are known to work on this OS. Issues may occur with other systems, and installation of packages may need to be trouble shooted. There are plans in the future to impliment a docker deployment of this code, and these installation instructions will be updated when this is completed. 
+>  This code has been set up on a Linux Ubuntu machine and tested on MacOS, and the packages are known to work on this OS. Issues may occur with other systems, and installation of packages may need to be trouble shooted. There are plans in the future to impliment a docker deployment of this code, and these installation instructions will be updated when this is completed. 
 
 ## 📁 Requirements of saved data
 
