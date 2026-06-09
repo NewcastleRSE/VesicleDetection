@@ -31,6 +31,7 @@ This should create a virtual conda enviroment, with name `VesicleDetection`, wit
 
 > [!WARNING]
 > Issues may occur with the above installation due to the `cython` and `funlib-evaluate` packages. If an error is raised saying it cannot find cython, it is advised to temporarily delete the funlib line from the requirements.txt file, run the pip install command to ensure cython is installed, and then paste the funlib line back in. Running the pip install command a second time should now finish the installation of all required packages.
+> If you are having issues with this still, and cython is installed (check with `pip show cython`) then you can try `pip install --no-build-isolation git+https://github.com/funkelab/funlib.evaluate.git`
 
 > [!IMPORTANT]
 >  This code has been set up on a Linux Ubuntu machine and tested on MacOS, and the packages are known to work on this OS. Issues may occur with other systems, and installation of packages may need to be trouble shooted. There are plans in the future to impliment a docker deployment of this code, and these installation instructions will be updated when this is completed. 
@@ -134,6 +135,12 @@ The user can use the `run.py` file to train their own network from scratch, in o
 When training, each validation prediction is given a set of 9 scores: reacll, precision and fscore for PC+ and PC- separetly as well as an average for each. The model is saved according to these scores: the checkpoints that perform best for each score are individually saved, along with their validation results. Additionally, for each score, two csv files will be created: `candidates.csv` and `stats.csv`. The former stores the centre coordinates for each vesicle, its confidence score and its label (1 = P+, 2 = PC-). The latter saves the scores for that particular iteration, along with the loss. Three further files are also saved: `best_scores.yaml`, `summary.yaml` and `training_config_used.yaml`: the first simply stores the best scores achieved, along with their iteration number; the second provides a summary of the training run, including how many PC+ and PC- vesicles were predicted, based on the best score specified in the config file; the third simply copies across the training config file used.
 
 It is possible to continue training a model, and this option is provided as a terminal input during the run. When done, the programme will first copy over all the saved model files from the previous run, and then resume training from there. An asterisk is used to indicate iteration numbers that belong to the previous training run. For example, assume the training runs are for 10000 iterations, then in the second run "Iteration 9600*" is the 9600th iteration of the first run, while "Iteration 1000" is the 1000th iteration in the second run (i.e. the 11000th total iteration). 
+
+## Next Steps:
+
+For generating data to continue training the model, or for generating data to feed into the Synaptic Activation Prediction model, please see SAP_data_generation.md. For information about using the Napari labelling tool, look at napari_crop_checker.py
+
+
 
 ## 💭 Feedback & Contributing 
 
